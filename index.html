@@ -46,7 +46,6 @@ function App(){
  const now=new Date(),today=key(now);
  const [cur,setCur]=useState({y:now.getFullYear(),m:now.getMonth()});
  const [year,setYear]=useState(false);
- const [wsize,setWsize]=useState(4);
  const [nn,setNn]=useState(''),[nw,setNw]=useState(10);
  useEffect(()=>{try{localStorage.setItem('dst',JSON.stringify(S))}catch(e){}},[S]);
  useEffect(()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})},[]);
@@ -118,19 +117,6 @@ function App(){
     <p className="text-sm mt-2">Най-продуктивен ден: <b>{WD[best]}</b> ({Math.round(wa[best])}%)</p></div>
   </div>};
 
- const Widget=()=>{
-  const n=wsize,list=Array.from({length:n},(_,i)=>key(new Date(now.getFullYear(),now.getMonth(),now.getDate()-(n-1-i))));
-  const cols=n===4?2:3;
-  return <div>
-   <h2 className="text-lg font-extrabold mb-2">Уиджет</h2>
-   <div className="flex gap-2 mb-4">{[[4,'2×2'],[6,'2×3'],[9,'3×3']].map(([v,l])=><button key={v} onClick={()=>setWsize(v)} className={`px-3 py-1.5 rounded-full text-sm font-semibold ${wsize===v?'bg-[#1F3A5F] text-white':'bg-white'}`}>{l}</button>)}</div>
-   <div className="mx-auto bg-white rounded-3xl p-4 shadow-lg" style={{width:n===4?190:n===6?'min(300px,100%)':'min(300px,100%)'}}>
-    <div className="flex justify-between items-baseline mb-2"><b>{MONTHS[now.getMonth()].slice(0,3)} {now.getDate()}</b><span className="text-sm font-bold">{pct(today)}%</span></div>
-    <div className="grid gap-2" style={{gridTemplateColumns:`repeat(${n===6?3:cols},1fr)`}}>{list.map(k=><Cell key={k} k={k} label={+k.slice(8)} sz="aspect-square" fs="text-sm"/>)}</div>
-    <button onClick={()=>setSheet(today)} className="mt-3 w-full py-2 rounded-xl bg-[#1F3A5F] text-white text-sm font-semibold">Отметни днес</button></div>
-   <p className="text-sm text-slate-600 text-center mt-4">Докосни днешния ден за бързо отмятане на задачите.</p>
-  </div>};
-
  const Sheet=()=>{
   const k=sheet,p=pct(k),d=S.done[k]||[],dt=new Date(k+'T00:00:00');
   return <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={()=>setSheet(null)}>
@@ -144,12 +130,12 @@ function App(){
     <textarea value={S.notes[k]||''} onChange={e=>note(k,e.target.value)} rows="3" placeholder="Бележка за деня – как мина?" className="w-full p-3 rounded-xl bg-slate-100 text-sm"/>
    </div></div>};
 
- const TABS=[['cal','Календар','cal'],['tasks','Задачи','list'],['stats','Статистики','chart'],['widget','Уиджет','grid']];
+ const TABS=[['cal','Календар','cal'],['tasks','Задачи','list'],['stats','Статистики','chart']];
  return <div className="max-w-md mx-auto min-h-screen pb-28 px-4 pt-4">
-  {tab==='cal'&&Calendar()}{tab==='tasks'&&Tasks()}{tab==='stats'&&Stats()}{tab==='widget'&&Widget()}
+  {tab==='cal'&&Calendar()}{tab==='tasks'&&Tasks()}{tab==='stats'&&Stats()}
   <button onClick={()=>setSheet(today)} className="fixed right-4 bottom-24 w-14 h-14 rounded-full bg-[#1F3A5F] text-white shadow-xl flex items-center justify-center" style={{marginBottom:'env(safe-area-inset-bottom)'}} aria-label="Отметни днес"><I n="check" s={26}/></button>
   <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200" style={{paddingBottom:'env(safe-area-inset-bottom)'}}>
-   <div className="max-w-md mx-auto grid grid-cols-4">{TABS.map(([id,l,ic])=><button key={id} onClick={()=>setTab(id)} className={`py-2.5 flex flex-col items-center text-xs font-semibold ${tab===id?'text-[#1F3A5F]':'text-slate-400'}`}><I n={ic}/>{l}</button>)}</div></nav>
+   <div className="max-w-md mx-auto grid grid-cols-3">{TABS.map(([id,l,ic])=><button key={id} onClick={()=>setTab(id)} className={`py-2.5 flex flex-col items-center text-xs font-semibold ${tab===id?'text-[#1F3A5F]':'text-slate-400'}`}><I n={ic}/>{l}</button>)}</div></nav>
   {sheet&&Sheet()}
  </div>}
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
