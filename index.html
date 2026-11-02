@@ -36,8 +36,15 @@ plus:'<path d="M5 12h14M12 5v14"/>',trash:'<path d="M3 6h18M19 6l-1 14H6L5 6M10 
 check:'<path d="M20 6 9 17l-5-5"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>',l:'<path d="m15 18-6-6 6-6"/>',r:'<path d="m9 18 6-6-6-6"/>'};
 const I=({n,s=20})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{__html:ICON[n]}}/>;
 
-const DEF={tasks:[{id:'a',name:'Спорт',w:30},{id:'b',name:'Четене',w:20},{id:'c',name:'Работа по проект',w:50}],done:{},notes:{},pal:'green'};
-const load=()=>{try{return {...DEF,...JSON.parse(localStorage.getItem('dst')||'{}')}}catch(e){return DEF}};
+const DEF_TASKS=[{id:'a',name:'Спорт',w:30},{id:'b',name:'Четене',w:20},{id:'c',name:'Работа по проект',w:50}];
+const DEF={tpls:[{id:'t1',name:'Шаблон 1',tasks:DEF_TASKS}],def:'t1',days:{},done:{},notes:{},pal:'green'};
+const load=()=>{try{
+ const raw=JSON.parse(localStorage.getItem('dst')||'{}'),s={...DEF,...raw};
+ if(!raw.tpls){ // миграция от старата версия: общите задачи стават „Шаблон 1“, а вече отбелязаните дни запазват своите задачи
+  const old=raw.tasks||DEF_TASKS;s.tpls=[{id:'t1',name:'Шаблон 1',tasks:old}];s.def='t1';s.days={};
+  Object.keys(s.done||{}).forEach(k=>{s.days[k]={tasks:old.map(t=>({...t})),tpl:'t1'}});}
+ delete s.tasks;return s;
+}catch(e){return DEF}};
 
 function App(){
  const [S,setS]=useState(load);
@@ -46,17 +53,22 @@ function App(){
  const now=new Date(),today=key(now);
  const [cur,setCur]=useState({y:now.getFullYear(),m:now.getMonth()});
  const [year,setYear]=useState(false);
- const [nn,setNn]=useState(''),[nw,setNw]=useState(10);
+ const [nn,setNn]=useState(''),[nw,setNw]=useState(10),[dn,setDn]=useState(''),[dw,setDw]=useState(10),[edit,setEdit]=useState(false),[selTpl,setSelTpl]=useState(null);
  useEffect(()=>{try{localStorage.setItem('dst',JSON.stringify(S))}catch(e){}},[S]);
  useEffect(()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})},[]);
  const R=SCALE;
- const total=S.tasks.reduce((a,t)=>a+t.w,0);
- const pct=k=>{if(!total)return 0;const d=S.done[k]||[];return Math.round(S.tasks.filter(t=>d.includes(t.id)).reduce((a,t)=>a+t.w,0)/total*1000)/10};
+ const tplOf=id=>S.tpls.find(t=>t.id===id)||S.tpls[0];
+ const dayTasks=k=>(S.days[k]&&S.days[k].tasks)||tplOf(S.def).tasks;
+ const pct=k=>{const T=dayTasks(k),total=T.reduce((a,t)=>a+t.w,0);if(!total)return 0;const d=S.done[k]||[];return Math.round(T.filter(t=>d.includes(t.id)).reduce((a,t)=>a+t.w,0)/total*1000)/10};
  const col=k=>R[Math.min(10,Math.round(pct(k)/10))]; // закръгляне към най-близката десетка (56% → 60%)
- const toggle=(k,id)=>setS(s=>{const d=s.done[k]||[];return {...s,done:{...s.done,[k]:d.includes(id)?d.filter(x=>x!==id):[...d,id]}}});
+ const mat=(s,k)=>s.days[k]?s:{...s,days:{...s.days,[k]:{tasks:tplOf(s.def).tasks.map(t=>({...t})),tpl:tplOf(s.def).id}}};
+ const toggle=(k,id)=>setS(s=>{s=mat(s,k);const d=s.done[k]||[];return {...s,done:{...s.done,[k]:d.includes(id)?d.filter(x=>x!==id):[...d,id]}}});
+ const updDay=(k,fn)=>setS(s=>{s=mat(s,k);return {...s,days:{...s.days,[k]:{...s.days[k],tasks:fn(s.days[k].tasks)}}}});
+ const applyTpl=(k,id)=>{const t=tplOf(id),ids=t.tasks.map(x=>x.id);if((S.done[k]||[]).some(i=>!ids.includes(i))&&!confirm('Отметките за задачи, които ги няма в този шаблон, ще се изгубят. Продължаваш ли?'))return;setS(s=>({...s,days:{...s.days,[k]:{tasks:t.tasks.map(x=>({...x})),tpl:id}},done:{...s.done,[k]:(s.done[k]||[]).filter(i=>ids.includes(i))}}))};
+ const open=k=>{setEdit(false);setSheet(k)};
  const note=(k,v)=>setS(s=>({...s,notes:{...s.notes,[k]:v}}));
  const Cell=({k,label,sz='aspect-square',fs='text-xs'})=>{const fut=k>today,c=col(k),p=pct(k);
-  return <button onClick={()=>setSheet(k)} aria-label={k+' '+p+'%'} className={`${sz} rounded-lg font-semibold ${fs} flex items-center justify-center ${k===today?'ring-2 ring-offset-1 ring-[#1F3A5F]':''} ${fut?'opacity-40':''}`}
+  return <button onClick={()=>open(k)} aria-label={k+' '+p+'%'} className={`${sz} rounded-lg font-semibold ${fs} flex items-center justify-center ${k===today?'ring-2 ring-offset-1 ring-[#1F3A5F]':''} ${fut?'opacity-40':''}`}
    style={{background:c,color:dark(c)?'#fff':'#16283F'}}>{label}</button>};
  const mdays=(y,m)=>{const first=(new Date(y,m,1).getDay()+6)%7,n=new Date(y,m+1,0).getDate();
   return [...Array(first).fill(null),...Array.from({length:n},(_,i)=>key(new Date(y,m,i+1)))]};
@@ -84,20 +96,32 @@ function App(){
    <Legend/>
   </div>};
 
- const Tasks=()=>{
-  const upd=(id,f)=>setS(s=>({...s,tasks:s.tasks.map(t=>t.id===id?{...t,...f}:t)}));
-  const add=()=>{if(!nn.trim())return;setS(s=>({...s,tasks:[...s.tasks,{id:Date.now().toString(36),name:nn.trim(),w:Math.min(100,Math.max(1,+nw||1))}]}));setNn('')};
+ const Tpls=()=>{
+  const tp=S.tpls.find(t=>t.id===selTpl)||tplOf(S.def),tt=tp.tasks.reduce((a,t)=>a+t.w,0);
+  const updT=f=>setS(s=>({...s,tpls:s.tpls.map(t=>t.id===tp.id?f(t):t)}));
+  const upd=(id,f)=>updT(t=>({...t,tasks:t.tasks.map(x=>x.id===id?{...x,...f}:x)}));
+  const add=()=>{if(!nn.trim())return;updT(t=>({...t,tasks:[...t.tasks,{id:Date.now().toString(36),name:nn.trim(),w:Math.min(100,Math.max(1,+nw||1))}]}));setNn('')};
+  const newT=copy=>{const n=prompt('Име на шаблона:',copy?tp.name+' (копие)':'Нов шаблон');if(!n||!n.trim())return;const id='t'+Date.now().toString(36);setS(s=>({...s,tpls:[...s.tpls,{id,name:n.trim(),tasks:copy?tp.tasks.map(x=>({...x})):[]}]}));setSelTpl(id)};
+  const del=()=>{if(S.tpls.length<2||!confirm('Изтриване на шаблон „'+tp.name+'“? Вече отбелязаните дни не се променят.'))return;const rest=S.tpls.filter(t=>t.id!==tp.id);setS(s=>({...s,tpls:rest,def:s.def===tp.id?rest[0].id:s.def}));setSelTpl(rest[0].id)};
   return <div>
-   <h2 className="text-lg font-extrabold mb-1">Задачи и тежести</h2>
-   <p className={`text-sm mb-3 ${total===100?'text-emerald-700':'text-amber-700'}`}>Сума на тежестите: {total}%{total!==100&&' — за точен резултат направи сумата 100%; иначе процентът се нормализира.'}</p>
-   <div className="space-y-2">{S.tasks.map(t=><div key={t.id} className="bg-white rounded-xl p-2 flex items-center gap-2">
+   <h2 className="text-lg font-extrabold mb-1">Шаблони</h2>
+   <p className="text-sm text-slate-600 mb-3">Шаблонът със ★ се зарежда автоматично за всеки ден. Промените в шаблон не засягат дни, в които вече има отметки.</p>
+   <div className="flex flex-wrap gap-2 mb-3">{S.tpls.map(t=><button key={t.id} onClick={()=>setSelTpl(t.id)} className={`px-3 py-1.5 rounded-full text-sm font-semibold ${t.id===tp.id?'bg-[#1F3A5F] text-white':'bg-white'}`}>{t.id===S.def?'★ ':''}{t.name}</button>)}
+    <button onClick={()=>newT(false)} className="px-3 py-1.5 rounded-full text-sm font-semibold bg-white">+ Нов</button></div>
+   <input value={tp.name} onChange={e=>updT(t=>({...t,name:e.target.value}))} className="w-full px-3 py-2 rounded-lg bg-white font-bold mb-2" aria-label="Име на шаблона"/>
+   <p className={`text-sm mb-3 ${tt===100?'text-emerald-700':'text-amber-700'}`}>Сума на тежестите: {tt}%{tt!==100&&' — за точен резултат направи сумата 100%; иначе процентът се нормализира.'}</p>
+   <div className="space-y-2">{tp.tasks.map(t=><div key={t.id} className="bg-white rounded-xl p-2 flex items-center gap-2">
      <input value={t.name} onChange={e=>upd(t.id,{name:e.target.value})} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100" aria-label="Име"/>
      <input type="number" min="1" max="100" value={t.w} onChange={e=>upd(t.id,{w:Math.min(100,Math.max(1,+e.target.value||1))})} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center" aria-label="Тежест"/><span className="text-sm">%</span>
-     <button className="p-2 text-red-600" aria-label="Изтрий" onClick={()=>confirm('Изтриване на „'+t.name+'“?')&&setS(s=>({...s,tasks:s.tasks.filter(x=>x.id!==t.id)}))}><I n="trash"/></button></div>)}</div>
+     <button className="p-2 text-red-600" aria-label="Изтрий" onClick={()=>confirm('Изтриване на „'+t.name+'“?')&&updT(x=>({...x,tasks:x.tasks.filter(y=>y.id!==t.id)}))}><I n="trash"/></button></div>)}</div>
    <div className="bg-white rounded-xl p-2 flex items-center gap-2 mt-3">
     <input value={nn} onChange={e=>setNn(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="Нова задача" className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100"/>
     <input type="number" value={nw} onChange={e=>setNw(e.target.value)} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center" aria-label="Тежест"/><span className="text-sm">%</span>
     <button onClick={add} className="p-2 rounded-lg bg-[#1F3A5F] text-white" aria-label="Добави"><I n="plus"/></button></div>
+   <div className="flex flex-wrap gap-2 mt-4 text-sm font-semibold">
+    <button disabled={tp.id===S.def} onClick={()=>setS(s=>({...s,def:tp.id}))} className="px-3 py-2 rounded-lg bg-[#1F3A5F] text-white disabled:opacity-40">{tp.id===S.def?'По подразбиране ★':'Направи по подразбиране'}</button>
+    <button onClick={()=>newT(true)} className="px-3 py-2 rounded-lg bg-white">Дублирай</button>
+    <button disabled={S.tpls.length<2} onClick={del} className="px-3 py-2 rounded-lg bg-white text-red-600 disabled:opacity-40">Изтрий</button></div>
   </div>};
 
  const Stats=()=>{
@@ -118,22 +142,40 @@ function App(){
   </div>};
 
  const Sheet=()=>{
-  const k=sheet,p=pct(k),d=S.done[k]||[],dt=new Date(k+'T00:00:00');
-  return <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={()=>setSheet(null)}>
+  const k=sheet,p=pct(k),d=S.done[k]||[],dt=new Date(k+'T00:00:00'),T=dayTasks(k),tot=T.reduce((a,t)=>a+t.w,0),cur=S.days[k]?S.days[k].tpl:S.def;
+  const close=()=>{setSheet(null);setEdit(false)};
+  const addD=()=>{if(!dn.trim())return;updDay(k,a=>[...a,{id:Date.now().toString(36),name:dn.trim(),w:Math.min(100,Math.max(1,+dw||1))}]);setDn('')};
+  const saveT=()=>{const n=prompt('Име на новия шаблон:');if(!n||!n.trim())return;setS(s=>({...s,tpls:[...s.tpls,{id:'t'+Date.now().toString(36),name:n.trim(),tasks:T.map(x=>({...x}))}]}))};
+  const chg=(id,f)=>updDay(k,a=>a.map(x=>x.id===id?{...x,...f}:x));
+  return <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={close}>
    <div className="sheet bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 max-h-[90vh] overflow-y-auto" style={{paddingBottom:'calc(1rem + env(safe-area-inset-bottom))'}} onClick={e=>e.stopPropagation()}>
     <div className="flex items-center justify-between mb-2"><div><div className="font-extrabold">{dt.getDate()} {MONTHS[dt.getMonth()]} {dt.getFullYear()}</div><div className="text-xs text-slate-500">{WD[(dt.getDay()+6)%7]}</div></div>
-     <div className="flex items-center gap-3"><span className="px-3 py-1 rounded-full font-extrabold" style={{background:col(k),color:dark(col(k))?'#fff':'#16283F'}}>{p}%</span><button onClick={()=>setSheet(null)} className="p-2" aria-label="Затвори"><I n="x"/></button></div></div>
-    <div className="space-y-2 my-3">{S.tasks.length===0&&<p className="text-sm text-slate-500">Няма задачи. Добави ги в раздел „Задачи“.</p>}
-     {S.tasks.map(t=>{const on=d.includes(t.id);return <button key={t.id} onClick={()=>toggle(k,t.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl text-left ${on?'bg-emerald-50':'bg-slate-100'}`}>
+     <div className="flex items-center gap-3"><span className="px-3 py-1 rounded-full font-extrabold" style={{background:col(k),color:dark(col(k))?'#fff':'#16283F'}}>{p}%</span><button onClick={close} className="p-2" aria-label="Затвори"><I n="x"/></button></div></div>
+    <label className="flex items-center gap-2 text-sm"><span className="text-slate-500">Шаблон:</span>
+     <select value={cur} onChange={e=>applyTpl(k,e.target.value)} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100">{S.tpls.map(t=><option key={t.id} value={t.id}>{t.id===S.def?'★ ':''}{t.name}</option>)}</select></label>
+    {!edit?<div className="space-y-2 my-3">{T.length===0&&<p className="text-sm text-slate-500">Няма задачи за този ден. Избери шаблон или натисни „Редактирай деня“.</p>}
+     {T.map(t=>{const on=d.includes(t.id);return <button key={t.id} onClick={()=>toggle(k,t.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl text-left ${on?'bg-emerald-50':'bg-slate-100'}`}>
       <span className={`w-6 h-6 rounded-md flex items-center justify-center border-2 ${on?'bg-emerald-600 border-emerald-600 text-white':'border-slate-400'}`}>{on&&<I n="check" s={16}/>}</span>
       <span className={`flex-1 ${on?'line-through text-slate-500':''}`}>{t.name}</span><span className="text-sm text-slate-500">{t.w}%</span></button>})}</div>
+    :<div className="my-3"><div className="space-y-2">{T.map(t=><div key={t.id} className="bg-slate-100 rounded-xl p-2 flex items-center gap-2">
+      <input value={t.name} onChange={e=>chg(t.id,{name:e.target.value})} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-white" aria-label="Име"/>
+      <input type="number" min="1" max="100" value={t.w} onChange={e=>chg(t.id,{w:Math.min(100,Math.max(1,+e.target.value||1))})} className="w-16 px-2 py-2 rounded-lg bg-white text-center" aria-label="Тежест"/><span className="text-sm">%</span>
+      <button className="p-2 text-red-600" aria-label="Изтрий" onClick={()=>updDay(k,a=>a.filter(x=>x.id!==t.id))}><I n="trash"/></button></div>)}</div>
+     <div className="bg-slate-100 rounded-xl p-2 flex items-center gap-2 mt-2">
+      <input value={dn} onChange={e=>setDn(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addD()} placeholder="Нова задача за деня" className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-white"/>
+      <input type="number" value={dw} onChange={e=>setDw(e.target.value)} className="w-16 px-2 py-2 rounded-lg bg-white text-center" aria-label="Тежест"/><span className="text-sm">%</span>
+      <button onClick={addD} className="p-2 rounded-lg bg-[#1F3A5F] text-white" aria-label="Добави"><I n="plus"/></button></div>
+     <p className={`text-xs mt-2 ${tot===100?'text-emerald-700':'text-amber-700'}`}>Сума на тежестите: {tot}%{tot!==100&&' — процентът се нормализира.'}</p></div>}
+    <div className="flex gap-2 mb-3 text-sm font-semibold">
+     <button onClick={()=>setEdit(!edit)} className="flex-1 py-2 rounded-xl bg-slate-100">{edit?'Готово':'Редактирай деня'}</button>
+     <button onClick={saveT} className="flex-1 py-2 rounded-xl bg-slate-100">Запази като шаблон</button></div>
     <textarea value={S.notes[k]||''} onChange={e=>note(k,e.target.value)} rows="3" placeholder="Бележка за деня – как мина?" className="w-full p-3 rounded-xl bg-slate-100 text-sm"/>
    </div></div>};
 
- const TABS=[['cal','Календар','cal'],['tasks','Задачи','list'],['stats','Статистики','chart']];
+ const TABS=[['cal','Календар','cal'],['tpl','Шаблони','list'],['stats','Статистики','chart']];
  return <div className="max-w-md mx-auto min-h-screen pb-28 px-4 pt-4">
-  {tab==='cal'&&Calendar()}{tab==='tasks'&&Tasks()}{tab==='stats'&&Stats()}
-  <button onClick={()=>setSheet(today)} className="fixed right-4 bottom-24 w-14 h-14 rounded-full bg-[#1F3A5F] text-white shadow-xl flex items-center justify-center" style={{marginBottom:'env(safe-area-inset-bottom)'}} aria-label="Отметни днес"><I n="check" s={26}/></button>
+  {tab==='cal'&&Calendar()}{tab==='tpl'&&Tpls()}{tab==='stats'&&Stats()}
+  <button onClick={()=>open(today)} className="fixed right-4 bottom-24 w-14 h-14 rounded-full bg-[#1F3A5F] text-white shadow-xl flex items-center justify-center" style={{marginBottom:'env(safe-area-inset-bottom)'}} aria-label="Отметни днес"><I n="check" s={26}/></button>
   <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200" style={{paddingBottom:'env(safe-area-inset-bottom)'}}>
    <div className="max-w-md mx-auto grid grid-cols-3">{TABS.map(([id,l,ic])=><button key={id} onClick={()=>setTab(id)} className={`py-2.5 flex flex-col items-center text-xs font-semibold ${tab===id?'text-[#1F3A5F]':'text-slate-400'}`}><I n={ic}/>{l}</button>)}</div></nav>
   {sheet&&Sheet()}
