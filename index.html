@@ -24,7 +24,7 @@ button{touch-action:manipulation}
 </style></head>
 <body><div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useMemo}=React;
+const {useState,useEffect,useMemo,useRef}=React;
 const MONTHS=['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
 const WD=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const key=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -65,7 +65,7 @@ function App(){
  const now=new Date(),today=key(now);
  const [cur,setCur]=useState({y:now.getFullYear(),m:now.getMonth()});
  const [year,setYear]=useState(false);
- const [nn,setNn]=useState(''),[nw,setNw]=useState(10),[dn,setDn]=useState(''),[dw,setDw]=useState(10),[edit,setEdit]=useState(false),[selTpl,setSelTpl]=useState(null);
+ const [nn,setNn]=useState(''),[nw,setNw]=useState(10),[dn,setDn]=useState(''),[dw,setDw]=useState(10),[edit,setEdit]=useState(false),[selTpl,setSelTpl]=useState(null),[drag,setDrag]=useState(null),rows=useRef({}),dr=useRef(null);
  useEffect(()=>{try{localStorage.setItem('dst',JSON.stringify(S))}catch(e){}},[S]);
  useEffect(()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})},[]);
  // Днешният и бъдещите дни следват шаблона си, освен ако не са редактирани ръчно; минали дни остават непроменени
@@ -118,6 +118,23 @@ function App(){
   const add=()=>{if(!nn.trim())return;updT(t=>({...t,tasks:[...t.tasks,{id:Date.now().toString(36),name:nn.trim(),w:Math.min(100,Math.max(1,+nw||1))}]}));setNn('')};
   const newT=copy=>{const n=prompt('Име на шаблона:',copy?tp.name+' (копие)':'Нов шаблон');if(!n||!n.trim())return;const id='t'+Date.now().toString(36);setS(s=>({...s,tpls:[...s.tpls,{id,name:n.trim(),tasks:copy?tp.tasks.map(x=>({...x})):[]}]}));setSelTpl(id)};
   const del=()=>{if(S.tpls.length<2||!confirm('Изтриване на шаблон „'+tp.name+'“? Вече отбелязаните дни не се променят.'))return;const rest=S.tpls.filter(t=>t.id!==tp.id);setS(s=>({...s,tpls:rest,def:s.def===tp.id?rest[0].id:s.def}));setSelTpl(rest[0].id)};
+  const startDrag=(e,id)=>{
+   e.preventDefault();
+   const ids=tp.tasks.map(t=>t.id),from=ids.indexOf(id),rects=ids.map(i=>rows.current[i].getBoundingClientRect());
+   dr.current={from,rects,y0:e.clientY,h:rects[from].height+8,to:from};
+   setDrag({id,from,to:from,dy:0,h:dr.current.h});
+   const mv=ev=>{const d=dr.current;if(!d)return;const dy=ev.clientY-d.y0,cy=d.rects[d.from].top+d.rects[d.from].height/2+dy;
+    d.to=d.rects.reduce((n,r,i)=>n+(i!==d.from&&cy>r.top+r.height/2?1:0),0);
+    setDrag({id,from:d.from,to:d.to,dy,h:d.h})};
+   const up=()=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);
+    const d=dr.current;dr.current=null;setDrag(null);
+    if(d&&d.to!==d.from)updT(t=>{const a=[...t.tasks],[x]=a.splice(a.findIndex(z=>z.id===id),1);a.splice(d.to,0,x);return {...t,tasks:a}})};
+   window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up)};
+  const moveBy=(id,dir)=>updT(t=>{const a=[...t.tasks],i=a.findIndex(z=>z.id===id),j=i+dir;if(j<0||j>=a.length)return t;[a[i],a[j]]=[a[j],a[i]];return {...t,tasks:a}});
+  const tf=(i,id)=>{if(!drag)return undefined;
+   if(id===drag.id)return {transform:`translateY(${drag.dy}px)`,zIndex:20,boxShadow:'0 8px 20px rgba(22,40,63,.25)'};
+   const {from,to,h}=drag,sh=from<to&&i>from&&i<=to?-h:(from>to&&i>=to&&i<from?h:0);
+   return {transform:`translateY(${sh}px)`,transition:'transform .15s'}};
   return <div>
    <h2 className="text-lg font-extrabold mb-1">Шаблони</h2>
    <p className="text-sm text-slate-600 mb-3">Шаблонът със ★ се зарежда автоматично за всеки ден. Промените в шаблон не засягат дни, в които вече има отметки.</p>
@@ -125,7 +142,8 @@ function App(){
     <button onClick={()=>newT(false)} className="px-3 py-1.5 rounded-full text-sm font-semibold bg-white">+ Нов</button></div>
    <input value={tp.name} onChange={e=>updT(t=>({...t,name:e.target.value}))} className="w-full px-3 py-2 rounded-lg bg-white font-bold mb-2" aria-label="Име на шаблона"/>
    <p className={`text-sm mb-3 ${tt===100?'text-emerald-700':'text-amber-700'}`}>Сума на тежестите: {tt}%{tt!==100&&' — за точен резултат направи сумата 100%; иначе процентът се нормализира.'}</p>
-   <div className="space-y-2">{tp.tasks.map(t=><div key={t.id} className="bg-white rounded-xl p-2 flex items-center gap-2">
+   <div className="space-y-2">{tp.tasks.map((t,i)=><div key={t.id} ref={el=>{rows.current[t.id]=el}} style={tf(i,t.id)} className="relative bg-white rounded-xl p-2 flex items-center gap-1">
+     <button onPointerDown={e=>startDrag(e,t.id)} onKeyDown={e=>{if(e.key==='ArrowUp'){e.preventDefault();moveBy(t.id,-1)}if(e.key==='ArrowDown'){e.preventDefault();moveBy(t.id,1)}}} className="shrink-0 p-1.5 cursor-grab select-none" style={{touchAction:'none'}} aria-label="Задръж и премести реда нагоре или надолу"><span className="w-5 h-5 rounded border-2 border-slate-400 text-slate-500 flex items-center justify-center"><I n="plus" s={12}/></span></button>
      <input value={t.name} onChange={e=>upd(t.id,{name:e.target.value})} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100" aria-label="Име"/>
      <WInput value={t.w} onCommit={w=>upd(t.id,{w})} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center"/><span className="text-sm">%</span>
      <button className="p-2 text-red-600" aria-label="Изтрий" onClick={()=>confirm('Изтриване на „'+t.name+'“?')&&updT(x=>({...x,tasks:x.tasks.filter(y=>y.id!==t.id)}))}><I n="trash"/></button></div>)}</div>
