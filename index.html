@@ -49,6 +49,15 @@ const load=()=>{try{
  delete s.tasks;return s;
 }catch(e){return DEF}};
 
+const sel=e=>{const el=e.target;setTimeout(()=>el.select(),0)};
+// Поле за тежест: селектира се при фокус, може да се изтрие докрай, а числото се записва, щом е валидно (1–100)
+function WInput({value,onCommit,className}){
+ const [t,setT]=useState(String(value));
+ useEffect(()=>{setT(String(value))},[value]);
+ return <input type="text" inputMode="numeric" pattern="[0-9]*" value={t} className={className} aria-label="Тежест" onFocus={sel}
+  onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,3);setT(v);const n=parseInt(v,10);if(n>=1)onCommit(Math.min(100,n))}}
+  onBlur={()=>{const n=parseInt(t,10);setT(n>=1?String(Math.min(100,n)):String(value))}}/>}
+
 function App(){
  const [S,setS]=useState(load);
  const [tab,setTab]=useState('cal');
@@ -59,6 +68,9 @@ function App(){
  const [nn,setNn]=useState(''),[nw,setNw]=useState(10),[dn,setDn]=useState(''),[dw,setDw]=useState(10),[edit,setEdit]=useState(false),[selTpl,setSelTpl]=useState(null);
  useEffect(()=>{try{localStorage.setItem('dst',JSON.stringify(S))}catch(e){}},[S]);
  useEffect(()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})},[]);
+ // Днешният и бъдещите дни следват шаблона си, освен ако не са редактирани ръчно; минали дни остават непроменени
+ const sync=s=>{let ch=false;const days={...s.days};Object.keys(days).forEach(k=>{const d=days[k];if(k<today||d.custom)return;const t=s.tpls.find(x=>x.id===d.tpl);if(t&&JSON.stringify(t.tasks)!==JSON.stringify(d.tasks)){days[k]={...d,tasks:t.tasks.map(x=>({...x}))};ch=true}});return ch?{...s,days}:s};
+ useEffect(()=>{setS(sync)},[S.tpls]);
  const R=SCALE;
  const tplOf=id=>S.tpls.find(t=>t.id===id)||S.tpls[0];
  const dayTasks=k=>(S.days[k]&&S.days[k].tasks)||tplOf(S.def).tasks;
@@ -66,7 +78,7 @@ function App(){
  const col=k=>R[Math.min(10,Math.round(pct(k)/10))]; // закръгляне към най-близката десетка (56% → 60%)
  const mat=(s,k)=>s.days[k]?s:{...s,days:{...s.days,[k]:{tasks:tplOf(s.def).tasks.map(t=>({...t})),tpl:tplOf(s.def).id}}};
  const toggle=(k,id)=>setS(s=>{s=mat(s,k);const d=s.done[k]||[];return {...s,done:{...s.done,[k]:d.includes(id)?d.filter(x=>x!==id):[...d,id]}}});
- const updDay=(k,fn)=>setS(s=>{s=mat(s,k);return {...s,days:{...s.days,[k]:{...s.days[k],tasks:fn(s.days[k].tasks)}}}});
+ const updDay=(k,fn)=>setS(s=>{s=mat(s,k);return {...s,days:{...s.days,[k]:{...s.days[k],tasks:fn(s.days[k].tasks),custom:true}}}});
  const applyTpl=(k,id)=>{const t=tplOf(id),ids=t.tasks.map(x=>x.id);if((S.done[k]||[]).some(i=>!ids.includes(i))&&!confirm('Отметките за задачи, които ги няма в този шаблон, ще се изгубят. Продължаваш ли?'))return;setS(s=>({...s,days:{...s.days,[k]:{tasks:t.tasks.map(x=>({...x})),tpl:id}},done:{...s.done,[k]:(s.done[k]||[]).filter(i=>ids.includes(i))}}))};
  const open=k=>{setEdit(false);setSheet(k)};
  const note=(k,v)=>setS(s=>({...s,notes:{...s.notes,[k]:v}}));
@@ -115,11 +127,11 @@ function App(){
    <p className={`text-sm mb-3 ${tt===100?'text-emerald-700':'text-amber-700'}`}>Сума на тежестите: {tt}%{tt!==100&&' — за точен резултат направи сумата 100%; иначе процентът се нормализира.'}</p>
    <div className="space-y-2">{tp.tasks.map(t=><div key={t.id} className="bg-white rounded-xl p-2 flex items-center gap-2">
      <input value={t.name} onChange={e=>upd(t.id,{name:e.target.value})} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100" aria-label="Име"/>
-     <input type="number" min="1" max="100" value={t.w} onChange={e=>upd(t.id,{w:Math.min(100,Math.max(1,+e.target.value||1))})} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center" aria-label="Тежест"/><span className="text-sm">%</span>
+     <WInput value={t.w} onCommit={w=>upd(t.id,{w})} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center"/><span className="text-sm">%</span>
      <button className="p-2 text-red-600" aria-label="Изтрий" onClick={()=>confirm('Изтриване на „'+t.name+'“?')&&updT(x=>({...x,tasks:x.tasks.filter(y=>y.id!==t.id)}))}><I n="trash"/></button></div>)}</div>
    <div className="bg-white rounded-xl p-2 flex items-center gap-2 mt-3">
     <input value={nn} onChange={e=>setNn(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="Нова задача" className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100"/>
-    <input type="number" value={nw} onChange={e=>setNw(e.target.value)} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center" aria-label="Тежест"/><span className="text-sm">%</span>
+    <input type="number" onFocus={sel} value={nw} onChange={e=>setNw(e.target.value)} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center" aria-label="Тежест"/><span className="text-sm">%</span>
     <button onClick={add} className="p-2 rounded-lg bg-[#1F3A5F] text-white" aria-label="Добави"><I n="plus"/></button></div>
    <div className="flex flex-wrap gap-2 mt-4 text-sm font-semibold">
     <button disabled={tp.id===S.def} onClick={()=>setS(s=>({...s,def:tp.id}))} className="px-3 py-2 rounded-lg bg-[#1F3A5F] text-white disabled:opacity-40">{tp.id===S.def?'По подразбиране ★':'Направи по подразбиране'}</button>
@@ -162,11 +174,11 @@ function App(){
       <span className={`flex-1 ${on?'line-through text-slate-500':''}`}>{t.name}</span><span className="text-sm text-slate-500">{t.w}%</span></button>})}</div>
     :<div className="my-3"><div className="space-y-2">{T.map(t=><div key={t.id} className="bg-slate-100 rounded-xl p-2 flex items-center gap-2">
       <input value={t.name} onChange={e=>chg(t.id,{name:e.target.value})} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-white" aria-label="Име"/>
-      <input type="number" min="1" max="100" value={t.w} onChange={e=>chg(t.id,{w:Math.min(100,Math.max(1,+e.target.value||1))})} className="w-16 px-2 py-2 rounded-lg bg-white text-center" aria-label="Тежест"/><span className="text-sm">%</span>
+      <WInput value={t.w} onCommit={w=>chg(t.id,{w})} className="w-16 px-2 py-2 rounded-lg bg-white text-center"/><span className="text-sm">%</span>
       <button className="p-2 text-red-600" aria-label="Изтрий" onClick={()=>updDay(k,a=>a.filter(x=>x.id!==t.id))}><I n="trash"/></button></div>)}</div>
      <div className="bg-slate-100 rounded-xl p-2 flex items-center gap-2 mt-2">
       <input value={dn} onChange={e=>setDn(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addD()} placeholder="Нова задача за деня" className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-white"/>
-      <input type="number" value={dw} onChange={e=>setDw(e.target.value)} className="w-16 px-2 py-2 rounded-lg bg-white text-center" aria-label="Тежест"/><span className="text-sm">%</span>
+      <input type="number" onFocus={sel} value={dw} onChange={e=>setDw(e.target.value)} className="w-16 px-2 py-2 rounded-lg bg-white text-center" aria-label="Тежест"/><span className="text-sm">%</span>
       <button onClick={addD} className="p-2 rounded-lg bg-[#1F3A5F] text-white" aria-label="Добави"><I n="plus"/></button></div>
      <p className={`text-xs mt-2 ${tot===100?'text-emerald-700':'text-amber-700'}`}>Сума на тежестите: {tot}%{tot!==100&&' — процентът се нормализира.'}</p></div>}
     <div className="flex gap-2 mb-3 text-sm font-semibold">
