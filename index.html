@@ -17,6 +17,7 @@
 body{font-family:Manrope,system-ui,sans-serif;background:#EEF2F6;color:#16283F;padding:env(safe-area-inset-top) 0 0;margin:0;min-height:100dvh;overflow-x:hidden;-webkit-text-size-adjust:100%}
 html{overflow-x:hidden}
 input,select,textarea{font-size:max(16px,1em)!important}
+input[readonly]{caret-color:transparent;cursor:default}
 button{touch-action:manipulation}
 .sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(40px);opacity:0}}
 @media(prefers-reduced-motion:reduce){.sheet{animation:none}}
@@ -50,13 +51,25 @@ const load=()=>{try{
 }catch(e){return DEF}};
 
 const sel=e=>{const el=e.target;setTimeout(()=>el.select(),0)};
-// Поле за тежест: селектира се при фокус, може да се изтрие докрай, а числото се записва, щом е валидно (1–100)
+// Полетата са заключени за редакция: отключват се с двойно докосване, а се затварят при излизане от полето или с Enter
+function useLock(all){
+ const [on,setOn]=useState(false),last=useRef(0);
+ return [on,setOn,{readOnly:!on,
+  onClick:e=>{if(on)return;const n=Date.now(),el=e.currentTarget;
+   if(n-last.current<450){el.readOnly=false;el.focus();if(all)el.select();else{const l=el.value.length;try{el.setSelectionRange(l,l)}catch(x){}}setOn(true)}
+   last.current=n},
+  onKeyDown:e=>{if(e.key==='Enter')e.currentTarget.blur()}}]}
+const RING=' ring-2 ring-[#3B6FD8]';
+function TInput({value,onChange,className,label,placeholder,onEnter}){
+ const [on,setOn,lp]=useLock(false);
+ return <input value={value} onChange={e=>onChange(e.target.value)} {...lp} onKeyDown={e=>{if(e.key==='Enter'){if(onEnter)onEnter();e.currentTarget.blur()}}} placeholder={placeholder} onBlur={()=>setOn(false)} className={className+(on?RING:'')} aria-label={label}/>}
+// Поле за тежест: числото може да се изтрие докрай и се записва, щом е валидно (1–100)
 function WInput({value,onCommit,className}){
- const [t,setT]=useState(String(value));
+ const [t,setT]=useState(String(value)),[on,setOn,lp]=useLock(true);
  useEffect(()=>{setT(String(value))},[value]);
- return <input type="text" inputMode="numeric" pattern="[0-9]*" value={t} className={className} aria-label="Тежест" onFocus={sel}
+ return <input type="text" inputMode="numeric" pattern="[0-9]*" value={t} {...lp} className={className+(on?RING:'')} aria-label="Тежест"
   onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,3);setT(v);const n=parseInt(v,10);if(n>=1)onCommit(Math.min(100,n))}}
-  onBlur={()=>{const n=parseInt(t,10);setT(n>=1?String(Math.min(100,n)):String(value))}}/>}
+  onBlur={()=>{setOn(false);const n=parseInt(t,10);setT(n>=1?String(Math.min(100,n)):String(value))}}/>}
 
 function App(){
  const [S,setS]=useState(load);
@@ -140,16 +153,16 @@ function App(){
    <p className="text-sm text-slate-600 mb-3">Шаблонът със ★ се зарежда автоматично за всеки ден. Промените в шаблон не засягат дни, в които вече има отметки.</p>
    <div className="flex flex-wrap gap-2 mb-3">{S.tpls.map(t=><button key={t.id} onClick={()=>setSelTpl(t.id)} className={`px-3 py-1.5 rounded-full text-sm font-semibold ${t.id===tp.id?'bg-[#1F3A5F] text-white':'bg-white'}`}>{t.id===S.def?'★ ':''}{t.name}</button>)}
     <button onClick={()=>newT(false)} className="px-3 py-1.5 rounded-full text-sm font-semibold bg-white">+ Нов</button></div>
-   <input value={tp.name} onChange={e=>updT(t=>({...t,name:e.target.value}))} className="w-full px-3 py-2 rounded-lg bg-white font-bold mb-2" aria-label="Име на шаблона"/>
+   <TInput value={tp.name} onChange={v=>updT(t=>({...t,name:v}))} className="w-full px-3 py-2 rounded-lg bg-white font-bold mb-2" label="Име на шаблона"/>
    <p className={`text-sm mb-3 ${tt===100?'text-emerald-700':'text-amber-700'}`}>Сума на тежестите: {tt}%{tt!==100&&' — за точен резултат направи сумата 100%; иначе процентът се нормализира.'}</p>
    <div className="space-y-2">{tp.tasks.map((t,i)=><div key={t.id} ref={el=>{rows.current[t.id]=el}} style={tf(i,t.id)} className="relative bg-white rounded-xl p-2 flex items-center gap-1">
      <button onPointerDown={e=>startDrag(e,t.id)} onKeyDown={e=>{if(e.key==='ArrowUp'){e.preventDefault();moveBy(t.id,-1)}if(e.key==='ArrowDown'){e.preventDefault();moveBy(t.id,1)}}} className="shrink-0 p-1.5 cursor-grab select-none" style={{touchAction:'none'}} aria-label="Задръж и премести реда нагоре или надолу"><span className="w-5 h-5 rounded border-2 border-slate-400 text-slate-500 flex items-center justify-center"><I n="plus" s={12}/></span></button>
-     <input value={t.name} onChange={e=>upd(t.id,{name:e.target.value})} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100" aria-label="Име"/>
+     <TInput value={t.name} onChange={v=>upd(t.id,{name:v})} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100" label="Име"/>
      <WInput value={t.w} onCommit={w=>upd(t.id,{w})} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center"/><span className="text-sm">%</span>
      <button className="p-2 text-red-600" aria-label="Изтрий" onClick={()=>confirm('Изтриване на „'+t.name+'“?')&&updT(x=>({...x,tasks:x.tasks.filter(y=>y.id!==t.id)}))}><I n="trash"/></button></div>)}</div>
    <div className="bg-white rounded-xl p-2 flex items-center gap-2 mt-3">
-    <input value={nn} onChange={e=>setNn(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="Нова задача" className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100"/>
-    <input type="number" onFocus={sel} value={nw} onChange={e=>setNw(e.target.value)} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center" aria-label="Тежест"/><span className="text-sm">%</span>
+    <TInput value={nn} onChange={setNn} onEnter={add} placeholder="Нова задача" className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-100" label="Нова задача"/>
+    <WInput value={nw} onCommit={setNw} className="w-16 px-2 py-2 rounded-lg bg-slate-100 text-center"/><span className="text-sm">%</span>
     <button onClick={add} className="p-2 rounded-lg bg-[#1F3A5F] text-white" aria-label="Добави"><I n="plus"/></button></div>
    <div className="flex flex-wrap gap-2 mt-4 text-sm font-semibold">
     <button disabled={tp.id===S.def} onClick={()=>setS(s=>({...s,def:tp.id}))} className="px-3 py-2 rounded-lg bg-[#1F3A5F] text-white disabled:opacity-40">{tp.id===S.def?'По подразбиране ★':'Направи по подразбиране'}</button>
@@ -191,12 +204,12 @@ function App(){
       <span className={`w-6 h-6 rounded-md flex items-center justify-center border-2 ${on?'bg-emerald-600 border-emerald-600 text-white':'border-slate-400'}`}>{on&&<I n="check" s={16}/>}</span>
       <span className={`flex-1 ${on?'line-through text-slate-500':''}`}>{t.name}</span><span className="text-sm text-slate-500">{t.w}%</span></button>})}</div>
     :<div className="my-3"><div className="space-y-2">{T.map(t=><div key={t.id} className="bg-slate-100 rounded-xl p-2 flex items-center gap-2">
-      <input value={t.name} onChange={e=>chg(t.id,{name:e.target.value})} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-white" aria-label="Име"/>
+      <TInput value={t.name} onChange={v=>chg(t.id,{name:v})} className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-white" label="Име"/>
       <WInput value={t.w} onCommit={w=>chg(t.id,{w})} className="w-16 px-2 py-2 rounded-lg bg-white text-center"/><span className="text-sm">%</span>
       <button className="p-2 text-red-600" aria-label="Изтрий" onClick={()=>updDay(k,a=>a.filter(x=>x.id!==t.id))}><I n="trash"/></button></div>)}</div>
      <div className="bg-slate-100 rounded-xl p-2 flex items-center gap-2 mt-2">
-      <input value={dn} onChange={e=>setDn(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addD()} placeholder="Нова задача за деня" className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-white"/>
-      <input type="number" onFocus={sel} value={dw} onChange={e=>setDw(e.target.value)} className="w-16 px-2 py-2 rounded-lg bg-white text-center" aria-label="Тежест"/><span className="text-sm">%</span>
+      <TInput value={dn} onChange={setDn} onEnter={addD} placeholder="Нова задача за деня" className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-white" label="Нова задача за деня"/>
+      <WInput value={dw} onCommit={setDw} className="w-16 px-2 py-2 rounded-lg bg-white text-center"/><span className="text-sm">%</span>
       <button onClick={addD} className="p-2 rounded-lg bg-[#1F3A5F] text-white" aria-label="Добави"><I n="plus"/></button></div>
      <p className={`text-xs mt-2 ${tot===100?'text-emerald-700':'text-amber-700'}`}>Сума на тежестите: {tot}%{tot!==100&&' — процентът се нормализира.'}</p></div>}
     <div className="flex gap-2 mb-3 text-sm font-semibold">
