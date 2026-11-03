@@ -17,6 +17,7 @@
 body{font-family:Manrope,system-ui,sans-serif;background:#EEF2F6;color:#16283F;padding:env(safe-area-inset-top) 0 0;margin:0;min-height:100dvh;overflow-x:hidden;-webkit-text-size-adjust:100%}
 html{overflow-x:hidden}
 input,select,textarea{font-size:max(16px,1em)!important}
+input{touch-action:manipulation}
 input[readonly]{caret-color:transparent;cursor:default}
 button{touch-action:manipulation}
 .sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(40px);opacity:0}}
@@ -64,9 +65,9 @@ const sel=e=>{const el=e.target;setTimeout(()=>el.select(),0)};
 // Полетата са заключени за редакция: отключват се с двойно докосване, а се затварят при излизане от полето или с Enter
 function useLock(all){
  const [on,setOn]=useState(false),last=useRef(0);
- return [on,setOn,{readOnly:!on,
+ return [on,setOn,{readOnly:!on,onFocus:e=>{if(e.currentTarget.readOnly)e.currentTarget.blur()},
   onClick:e=>{if(on)return;const n=Date.now(),el=e.currentTarget;
-   if(n-last.current<450){el.readOnly=false;el.focus();if(all)el.select();else{const l=el.value.length;try{el.setSelectionRange(l,l)}catch(x){}}setOn(true)}
+   if(n-last.current<450){el.readOnly=false;el.focus();if(all){el.select();try{el.setSelectionRange(0,el.value.length)}catch(x){}}else{const l=el.value.length;try{el.setSelectionRange(l,l)}catch(x){}}setOn(true)}
    last.current=n},
   onKeyDown:e=>{if(e.key==='Enter')e.currentTarget.blur()}}]}
 const RING=' ring-2 ring-[#3B6FD8]';
