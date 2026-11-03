@@ -42,14 +42,16 @@ const I=({n,s=20})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" st
 
 const DEF_TASKS=[{id:'a',name:'Спорт',w:30},{id:'b',name:'Четене',w:20},{id:'c',name:'Работа по проект',w:50}];
 const DEF={tpls:[{id:'t1',name:'Шаблон 1',tasks:DEF_TASKS}],def:'t1',days:{},done:{},notes:{},pal:'green'};
-const load=()=>{try{
- const raw=JSON.parse(localStorage.getItem('dst')||'{}'),s={...DEF,...raw};
+const norm=raw=>{
+ const s={...DEF,...raw};
  if(!raw.tpls){ // миграция от старата версия: общите задачи стават „Шаблон 1“, а вече отбелязаните дни запазват своите задачи
   const old=raw.tasks||DEF_TASKS;s.tpls=[{id:'t1',name:'Шаблон 1',tasks:old}];s.def='t1';s.days={};
   Object.keys(s.done||{}).forEach(k=>{s.days[k]={tasks:old.map(t=>({...t})),tpl:'t1'}});}
- delete s.tasks;return s;
-}catch(e){return DEF}};
-
+ if(!s.tpls.some(t=>t.id===s.def))s.def=s.tpls[0].id;
+ delete s.tasks;return s};
+const load=()=>{try{return norm(JSON.parse(localStorage.getItem('dst')||'{}'))}catch(e){return DEF}};
+// Проверка на данни за импорт (нов формат с шаблони или стария със задачи)
+const valid=d=>!!d&&typeof d==='object'&&((Array.isArray(d.tpls)&&d.tpls.length>0&&d.tpls.every(t=>t&&t.id&&Array.isArray(t.tasks)))||(!d.tpls&&Array.isArray(d.tasks)))&&['done','notes','days'].every(k=>d[k]==null||typeof d[k]==='object');
 const sel=e=>{const el=e.target;setTimeout(()=>el.select(),0)};
 // Полетата са заключени за редакция: отключват се с двойно докосване, а се затварят при излизане от полето или с Enter
 function useLock(all){
@@ -78,7 +80,7 @@ function App(){
  const now=new Date(),today=key(now);
  const [cur,setCur]=useState({y:now.getFullYear(),m:now.getMonth()});
  const [year,setYear]=useState(false);
- const [nn,setNn]=useState(''),[nw,setNw]=useState(10),[dn,setDn]=useState(''),[dw,setDw]=useState(10),[edit,setEdit]=useState(false),[selTpl,setSelTpl]=useState(null),[drag,setDrag]=useState(null),rows=useRef({}),dr=useRef(null);
+ const [nn,setNn]=useState(''),[nw,setNw]=useState(10),[dn,setDn]=useState(''),[dw,setDw]=useState(10),[edit,setEdit]=useState(false),[selTpl,setSelTpl]=useState(null),[drag,setDrag]=useState(null),rows=useRef({}),dr=useRef(null),[xfer,setXfer]=useState(false),fileRef=useRef(null);
  useEffect(()=>{try{localStorage.setItem('dst',JSON.stringify(S))}catch(e){}},[S]);
  useEffect(()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})},[]);
  // Днешният и бъдещите дни следват шаблона си, освен ако не са редактирани ръчно; минали дни остават непроменени
@@ -94,6 +96,21 @@ function App(){
  const updDay=(k,fn)=>setS(s=>{s=mat(s,k);return {...s,days:{...s.days,[k]:{...s.days[k],tasks:fn(s.days[k].tasks),custom:true}}}});
  const applyTpl=(k,id)=>{const t=tplOf(id),ids=t.tasks.map(x=>x.id);if((S.done[k]||[]).some(i=>!ids.includes(i))&&!confirm('Отметките за задачи, които ги няма в този шаблон, ще се изгубят. Продължаваш ли?'))return;setS(s=>({...s,days:{...s.days,[k]:{tasks:t.tasks.map(x=>({...x})),tpl:id}},done:{...s.done,[k]:(s.done[k]||[]).filter(i=>ids.includes(i))}}))};
  const open=k=>{setEdit(false);setSheet(k)};
+ // Експорт: на телефони – меню „Сподели“ (запис във Файлове/Drive, изпращане), иначе – изтегляне на файл
+ const exportData=async()=>{
+  setXfer(false);
+  const json=JSON.stringify({app:'dnevenuspeh',v:1,exported:new Date().toISOString(),data:S},null,1),name='dneven-uspeh-'+key(new Date())+'.json';
+  try{const f=new File([json],name,{type:'application/json'});
+   if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Дневен успех'});return}
+  }catch(e){if(e&&e.name==='AbortError')return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
+ const importFile=async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+  try{const j=JSON.parse(await f.text()),d=j&&j.app==='dnevenuspeh'?j.data:j;
+   if(!valid(d))throw 0;
+   if(!confirm('Импортът ще замени всички данни на това устройство. Продължаваш ли?'))return;
+   setS(norm(d));setXfer(false);alert('Данните са импортирани успешно.')}
+  catch(err){alert('Файлът не е валиден за „Дневен успех“.')}};
  const note=(k,v)=>setS(s=>({...s,notes:{...s.notes,[k]:v}}));
  const Cell=({k,label,sz='aspect-square',fs='text-xs'})=>{const fut=k>today,c=col(k),p=pct(k);
   return <button onClick={()=>open(k)} aria-label={k+' '+p+'%'} className={`${sz} rounded-lg font-semibold ${fs} flex items-center justify-center ${k===today?'ring-2 ring-offset-1 ring-[#1F3A5F]':''} ${fut?'opacity-40':''}`}
@@ -185,6 +202,14 @@ function App(){
    <div className="bg-white rounded-xl p-3"><div className="text-sm font-bold mb-2">Средно по дни от седмицата (90 дни)</div>
     <div className="flex items-end gap-2 h-28">{wa.map((v,i)=><div key={i} className="flex-1 flex flex-col justify-end items-center h-full"><span className="text-[10px]">{Math.round(v)}</span><div className={`w-full rounded-t ${i===best?'bg-[#1F3A5F]':'bg-slate-300'}`} style={{height:Math.max(v,2)+'%'}}/><span className="text-xs mt-1">{WD[i]}</span></div>)}</div>
     <p className="text-sm mt-2">Най-продуктивен ден: <b>{WD[best]}</b> ({Math.round(wa[best])}%)</p></div>
+   <div className="relative">
+    <button onClick={()=>setXfer(!xfer)} className="w-full bg-white rounded-xl p-3 flex items-center justify-between text-left font-bold" aria-expanded={xfer}>Прехвърляне на данни<I n="r"/></button>
+    {xfer&&<><div className="fixed inset-0 z-40" onClick={()=>setXfer(false)}/>
+     <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-xl shadow-xl border border-slate-200 p-2 flex gap-2">
+      <button onClick={()=>fileRef.current&&fileRef.current.click()} className="px-4 py-2 rounded-lg bg-slate-100 text-sm font-semibold">Импорт</button>
+      <button onClick={exportData} className="px-4 py-2 rounded-lg bg-[#1F3A5F] text-white text-sm font-semibold">Експорт</button></div></>}
+    <input ref={fileRef} type="file" accept=".json,application/json,text/plain" className="hidden" onChange={importFile}/>
+   </div>
   </div>};
 
  const Sheet=()=>{
