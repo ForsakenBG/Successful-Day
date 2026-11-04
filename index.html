@@ -31,6 +31,7 @@ const MONTHS=['Януари','Февруари','Март','Април','Май'
 const WD=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const key=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const wd=k=>(new Date(k+'T00:00:00').getDay()+6)%7; // 0 = понеделник
+const rr=(c,x,y,w,h,r)=>{c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()};
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 // Фиксирана скала от 11 стъпки: индекс 0 = 0%, 1 = 10% ... 10 = 100%
 const SCALE=['#cfcfcf','#ab0000','#ff5757','#ff8000','#ffb300','#fff178','#c289fa','#6fd1fc','#325ff0','#6bed9a','#15803d'];
@@ -39,7 +40,7 @@ const ICON={cal:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2
 list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',chart:'<path d="M3 3v18h18M18 17V9M13 17V5M8 17v-3"/>',
 grid:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
 plus:'<path d="M5 12h14M12 5v14"/>',trash:'<path d="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>',
-check:'<path d="M20 6 9 17l-5-5"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>',l:'<path d="m15 18-6-6 6-6"/>',r:'<path d="m9 18 6-6-6-6"/>'};
+check:'<path d="M20 6 9 17l-5-5"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>',share:'<path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13"/>',l:'<path d="m15 18-6-6 6-6"/>',r:'<path d="m9 18 6-6-6-6"/>'};
 const I=({n,s=20})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{__html:ICON[n]}}/>;
 
 const DEF_TASKS=[{id:'a',name:'Спорт',w:30},{id:'b',name:'Четене',w:20},{id:'c',name:'Работа по проект',w:50}];
@@ -62,25 +63,33 @@ const load=()=>{try{return norm(JSON.parse(localStorage.getItem('dst')||'{}'))}c
 // Проверка на данни за импорт (нов формат с шаблони или стария със задачи)
 const valid=d=>!!d&&typeof d==='object'&&((Array.isArray(d.tpls)&&d.tpls.length>0&&d.tpls.every(t=>t&&t.id&&Array.isArray(t.tasks)))||(!d.tpls&&Array.isArray(d.tasks)))&&['done','notes','days'].every(k=>d[k]==null||typeof d[k]==='object');
 const sel=e=>{const el=e.target;setTimeout(()=>el.select(),0)};
-// Полетата са заключени за редакция: отключват се с двойно докосване, а се затварят при излизане от полето или с Enter
-function useLock(all){
- const [on,setOn]=useState(false),last=useRef(0);
- return [on,setOn,{readOnly:!on,onFocus:e=>{if(e.currentTarget.readOnly)e.currentTarget.blur()},
-  onClick:e=>{if(on)return;const n=Date.now(),el=e.currentTarget;
-   if(n-last.current<450){el.readOnly=false;el.focus();if(all){el.select();try{el.setSelectionRange(0,el.value.length)}catch(x){}}else{const l=el.value.length;try{el.setSelectionRange(l,l)}catch(x){}}setOn(true)}
-   last.current=n},
-  onKeyDown:e=>{if(e.key==='Enter')e.currentTarget.blur()}}]}
+// Полетата са заключени за редакция: отключват се с двойно докосване (при превъртане не се отварят), затварят се при излизане от полето или с Enter.
+// Докосването минава през обвивка, а заключеното поле не приема докосвания и фокус – така на iPhone няма излишно фокусиране и клавиатурата се отваря надеждно.
 const RING=' ring-2 ring-[#3B6FD8]';
+function Lk({className='',all,onEnter,onBlur,...p}){
+ const [on,setOn]=useState(false),[hint,setHint]=useState(false),last=useRef(0),ref=useRef(null);
+ const L=[],R=[];className.split(' ').filter(Boolean).forEach(c=>(/^(flex-1|min-w-0|w-\d+|w-full|mb-\d+|shrink-0)$/.test(c)?L:R).push(c));
+ const tap=()=>{if(on)return;const n=Date.now(),el=ref.current;
+  if(n-last.current<500){last.current=0;setHint(false);
+   el.style.pointerEvents='auto';el.readOnly=false;el.tabIndex=0;el.focus();
+   const l=el.value.length;try{all?el.setSelectionRange(0,l):el.setSelectionRange(l,l)}catch(x){}
+   if(all&&el.select)el.select();
+   setOn(true)}
+  else{last.current=n;setHint(true);setTimeout(()=>setHint(false),500)}};
+ return <div className={L.join(' ')+' relative'} onClick={tap} style={{touchAction:'manipulation',cursor:on?'text':'pointer',WebkitTapHighlightColor:'transparent'}}>
+  <input ref={ref} {...p} readOnly={!on} tabIndex={on?0:-1} style={{pointerEvents:on?'auto':'none'}}
+   className={'w-full '+R.join(' ')+(on?RING:(hint?' ring-2 ring-slate-300':''))}
+   onBlur={e=>{setOn(false);if(onBlur)onBlur(e)}}
+   onKeyDown={e=>{if(e.key==='Enter'){if(onEnter)onEnter();e.currentTarget.blur()}}}/></div>}
 function TInput({value,onChange,className,label,placeholder,onEnter}){
- const [on,setOn,lp]=useLock(false);
- return <input value={value} onChange={e=>onChange(e.target.value)} {...lp} onKeyDown={e=>{if(e.key==='Enter'){if(onEnter)onEnter();e.currentTarget.blur()}}} placeholder={placeholder} onBlur={()=>setOn(false)} className={className+(on?RING:'')} aria-label={label}/>}
+ return <Lk className={className} all={false} aria-label={label} placeholder={placeholder} value={value} onChange={e=>onChange(e.target.value)} onEnter={onEnter}/>}
 // Поле за тежест: числото може да се изтрие докрай и се записва, щом е валидно (1–100)
 function WInput({value,onCommit,className}){
- const [t,setT]=useState(String(value)),[on,setOn,lp]=useLock(true);
+ const [t,setT]=useState(String(value));
  useEffect(()=>{setT(String(value))},[value]);
- return <input type="text" inputMode="numeric" pattern="[0-9]*" value={t} {...lp} className={className+(on?RING:'')} aria-label="Тежест"
+ return <Lk className={className} all={true} aria-label="Тежест" type="text" inputMode="numeric" pattern="[0-9]*" value={t}
   onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,3);setT(v);const n=parseInt(v,10);if(n>=1)onCommit(Math.min(100,n))}}
-  onBlur={()=>{setOn(false);const n=parseInt(t,10);setT(n>=1?String(Math.min(100,n)):String(value))}}/>}
+  onBlur={()=>{const n=parseInt(t,10);setT(n>=1?String(Math.min(100,n)):String(value))}}/>}
 
 function App(){
  const [S,setS]=useState(load);
@@ -89,7 +98,7 @@ function App(){
  const now=new Date(),today=key(now);
  const [cur,setCur]=useState({y:now.getFullYear(),m:now.getMonth()});
  const [year,setYear]=useState(false);
- const [nn,setNn]=useState(''),[nw,setNw]=useState(10),[dn,setDn]=useState(''),[dw,setDw]=useState(10),[edit,setEdit]=useState(false),[selTpl,setSelTpl]=useState(null),[drag,setDrag]=useState(null),rows=useRef({}),dr=useRef(null),[xfer,setXfer]=useState(false),fileRef=useRef(null);
+ const [nn,setNn]=useState(''),[nw,setNw]=useState(10),[dn,setDn]=useState(''),[dw,setDw]=useState(10),[edit,setEdit]=useState(false),[selTpl,setSelTpl]=useState(null),[drag,setDrag]=useState(null),rows=useRef({}),dr=useRef(null),[xfer,setXfer]=useState(false),[shr,setShr]=useState(false),fileRef=useRef(null);
  useEffect(()=>{try{localStorage.setItem('dst',JSON.stringify(S))}catch(e){}},[S]);
  useEffect(()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})},[]);
  // Днешният и бъдещите дни следват шаблона си, освен ако не са редактирани ръчно; минали дни остават непроменени
@@ -120,6 +129,53 @@ function App(){
    if(!confirm('Импортът ще замени всички данни на това устройство. Продължаваш ли?'))return;
    setS(norm(d));setXfer(false);alert('Данните са импортирани успешно.')}
   catch(err){alert('Файлът не е валиден за „Дневен успех“.')}};
+ // Снимка на календара (месец или година) за споделяне
+ const drawShare=kind=>{
+  const yr=kind==='y',W=1080,H=yr?1920:1350,cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const c=cv.getContext('2d'),F=(w,z)=>w+' '+z+'px Manrope, system-ui, sans-serif';
+  const keys=yr?[...Array(12).keys()].flatMap(m=>mdays(cur.y,m).filter(Boolean)):mdays(cur.y,cur.m).filter(Boolean);
+  const first=Object.keys(S.done).filter(k=>S.done[k].length).sort()[0];
+  const used=first?keys.filter(k=>k<=today&&k>=first):[];
+  const avg=used.length?Math.round(used.reduce((a,k)=>a+pct(k),0)/used.length*10)/10:null;
+  c.fillStyle='#EEF2F6';c.fillRect(0,0,W,H);
+  c.fillStyle='#1F3A5F';c.fillRect(0,0,W,230);
+  c.fillStyle='#fff';c.textBaseline='alphabetic';c.textAlign='left';
+  c.font=F(800,yr?110:68);c.fillText(yr?String(cur.y):MONTHS[cur.m]+' '+cur.y,70,140);
+  c.font=F(600,36);c.fillText('Дневен успех',70,196);
+  if(avg!==null){c.textAlign='right';c.font=F(800,88);c.fillText(avg+'%',W-70,140);c.font=F(600,36);c.fillText('среден успех',W-70,196)}
+  if(!yr){
+   const cell=122,gap=14,x0=71;
+   c.textAlign='center';c.textBaseline='middle';c.font=F(600,32);c.fillStyle='#64748B';
+   WD.forEach((w,i)=>c.fillText(w,x0+i*(cell+gap)+cell/2,285));
+   mdays(cur.y,cur.m).forEach((k,i)=>{if(!k)return;const x=x0+(i%7)*(cell+gap),y=325+Math.floor(i/7)*(cell+gap),bg=col(k);
+    c.globalAlpha=k>today?.4:1;c.fillStyle=bg;rr(c,x,y,cell,cell,24);c.fill();
+    c.fillStyle=dark(bg)?'#fff':'#16283F';c.font=F(800,46);c.fillText(String(+k.slice(8)),x+cell/2,y+cell/2+2);
+    c.globalAlpha=1;
+    if(k===today){c.lineWidth=7;c.strokeStyle='#1F3A5F';rr(c,x-5,y-5,cell+10,cell+10,28);c.stroke()}});
+  }else{
+   const bw=290,cg=35,sq=38,sg=4,x0=70;
+   [...Array(12).keys()].forEach(m=>{const bx=x0+(m%3)*(bw+cg),by=280+Math.floor(m/3)*340;
+    c.fillStyle='#fff';rr(c,bx-10,by-10,bw+20,310,22);c.fill();
+    c.textAlign='left';c.textBaseline='alphabetic';c.fillStyle='#16283F';c.font=F(800,30);c.fillText(MONTHS[m],bx,by+26);
+    mdays(cur.y,m).forEach((k,i)=>{if(!k)return;const x=bx+(i%7)*(sq+sg),y=by+48+Math.floor(i/7)*(sq+sg);
+     c.globalAlpha=k>today?.4:1;c.fillStyle=col(k);rr(c,x,y,sq,sq,7);c.fill();c.globalAlpha=1;
+     if(k===today){c.lineWidth=4;c.strokeStyle='#1F3A5F';rr(c,x-2,y-2,sq+4,sq+4,9);c.stroke()}})});
+  }
+  const ly=yr?1700:1190,sw=74,sgp=6,lx=(W-(11*sw+10*sgp))/2;
+  SCALE.forEach((cl,i)=>{c.fillStyle=cl;rr(c,lx+i*(sw+sgp),ly,sw,34,8);c.fill()});
+  c.fillStyle='#64748B';c.font=F(600,26);c.textBaseline='alphabetic';c.textAlign='left';c.fillText('0%',lx,ly+68);
+  c.textAlign='right';c.fillText('100%',lx+11*sw+10*sgp,ly+68);
+  return cv};
+ // Споделяне: на телефони през менюто „Сподели“, на компютър – изтегляне на PNG. Всичко е синхронно преди share(), за да не се губи жестът на потребителя (важно за iPhone).
+ const shareImg=async kind=>{
+  setShr(false);
+  const cv=drawShare(kind),b=atob(cv.toDataURL('image/png').split(',')[1]),u=new Uint8Array(b.length);
+  for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+  const name='dneven-uspeh-'+(kind==='m'?cur.y+'-'+String(cur.m+1).padStart(2,'0'):cur.y)+'.png';
+  try{const f=new File([u],name,{type:'image/png'});
+   if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Дневен успех'});return}
+  }catch(e){if(e&&e.name==='AbortError')return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u],{type:'image/png'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
  const note=(k,v)=>setS(s=>({...s,notes:{...s.notes,[k]:v}}));
  const Cell=({k,label,sz='aspect-square',fs='text-xs'})=>{const fut=k>today,c=col(k),p=pct(k);
   return <button onClick={()=>open(k)} aria-label={k+' '+p+'%'} className={`${sz} rounded-lg font-semibold ${fs} flex items-center justify-center ${k===today?'ring-2 ring-offset-1 ring-[#1F3A5F]':''} ${fut?'opacity-40':''}`}
@@ -137,8 +193,14 @@ function App(){
      <h2 className="text-lg font-extrabold min-w-[9.5rem] text-center">{year?cur.y:MONTHS[cur.m]+' '+cur.y}</h2>
      <button className="p-2" onClick={()=>year?setCur({...cur,y:cur.y+1}):shift(1)} aria-label="Напред"><I n="r"/></button>
     </div>
-    <div className="flex rounded-lg bg-white p-0.5 text-sm font-semibold">
+    <div className="flex items-center gap-2"><div className="flex rounded-lg bg-white p-0.5 text-sm font-semibold">
      {[['Месец',false],['Година',true]].map(([l,v])=><button key={l} onClick={()=>setYear(v)} className={`px-3 py-1 rounded-md ${year===v?'bg-[#1F3A5F] text-white':''}`}>{l}</button>)}
+    </div>
+    <div className="relative"><button onClick={()=>setShr(!shr)} className="p-2 rounded-lg bg-white" aria-label="Сподели календара" aria-expanded={shr}><I n="share"/></button>
+     {shr&&<><div className="fixed inset-0 z-40" onClick={()=>setShr(false)}/>
+      <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-xl shadow-xl border border-slate-200 p-2 flex flex-col gap-2 w-44">
+       <button onClick={()=>shareImg('m')} className="px-4 py-2 rounded-lg bg-slate-100 text-sm font-semibold">Сподели месец</button>
+       <button onClick={()=>shareImg('y')} className="px-4 py-2 rounded-lg bg-[#1F3A5F] text-white text-sm font-semibold">Сподели година</button></div></>}</div>
     </div></div>
    {!year?<div className="bg-white rounded-2xl p-3">
      <div className="grid grid-cols-7 gap-1.5 mb-1.5 text-center text-xs text-slate-500">{WD.map(w=><div key={w}>{w}</div>)}</div>
