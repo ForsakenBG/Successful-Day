@@ -81,15 +81,23 @@ const I = ({
 const DEF_TASKS = [{
   id: 'a',
   name: 'Спорт',
-  w: 30
+  w: 20
 }, {
   id: 'b',
   name: 'Четене',
   w: 20
 }, {
-  id: 'c',
-  name: 'Работа по проект',
-  w: 50
+  id: 'c1',
+  name: 'Работа - Добре',
+  w: 30
+}, {
+  id: 'c2',
+  name: 'Работа - Много добре',
+  w: 20
+}, {
+  id: 'd',
+  name: 'Чай вместо кафе',
+  w: 10
 }];
 const REST_TASKS = [{
   id: 'r1',
@@ -109,7 +117,7 @@ const REST_TASKS = [{
   w: 20
 }, {
   id: 'r5',
-  name: 'Излизане с приятели',
+  name: 'Време с приятели',
   w: 20
 }];
 const DEF = {
@@ -167,6 +175,22 @@ const norm = raw => {
     s.wk = [0, 1, 2, 3, 4].map(() => s.def).concat([r.id, r.id]);
   }
   s.wk = s.wk.map(id => s.tpls.some(t => t.id === id) ? id : s.tpls[0].id);
+  if ((raw.v || 0) < 2) {
+    s.tpls = s.tpls.map(t => {
+      let tasks = t.tasks.map(x => x.name === 'Излизане с приятели' ? {
+        ...x,
+        name: 'Време с приятели'
+      } : x);
+      if (t.name === 'Работни дни' && tasks.map(x => x.name + ':' + x.w).join('|') === 'Спорт:30|Четене:20|Работа по проект:50') tasks = DEF_TASKS.map(x => ({
+        ...x
+      }));
+      return {
+        ...t,
+        tasks
+      };
+    });
+  }
+  s.v = 2;
   delete s.tasks;
   delete s.def;
   return s;
