@@ -26,6 +26,23 @@ const loadBk = () => {
     return {};
   }
 };
+let DEFER = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  DEFER = e;
+  window.dispatchEvent(new Event('inst-ready'));
+});
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+const IS_AND = /Android/i.test(navigator.userAgent);
+const STANDALONE = window.matchMedia && matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const instDef = () => IS_IOS ? /CriOS/.test(navigator.userAgent) ? 'chrome' : 'safari' : IS_AND ? 'and' : 'safari';
+const instSeen = () => {
+  try {
+    return localStorage.getItem('dst-inst') === '1';
+  } catch (e) {
+    return false;
+  }
+};
 const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const SCALE = ['#cfcfcf', '#ab0000', '#ff5757', '#ff8000', '#ffb300', '#fff178', '#c289fa', '#6fd1fc', '#325ff0', '#6bed9a', '#15803d'];
 const dark = c => {
@@ -303,6 +320,9 @@ function App() {
     [xfer, setXfer] = useState(false),
     [shr, setShr] = useState(false),
     [bk, setBk] = useState(loadBk),
+    [inst, setInst] = useState(() => !STANDALONE && (IS_IOS || IS_AND) && !instSeen()),
+    [itab, setItab] = useState(instDef),
+    [canInst, setCanInst] = useState(!!DEFER),
     fileRef = useRef(null);
   useEffect(() => {
     try {
@@ -311,6 +331,12 @@ function App() {
   }, [S]);
   useEffect(() => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  }, []);
+  useEffect(() => {
+    const f = () => setCanInst(!!DEFER);
+    window.addEventListener('inst-ready', f);
+    f();
+    return () => window.removeEventListener('inst-ready', f);
   }, []);
   useEffect(() => {
     try {
@@ -682,6 +708,97 @@ function App() {
       m: t.getMonth()
     };
   });
+  const hideInst = () => {
+    try {
+      localStorage.setItem('dst-inst', '1');
+    } catch (e) {}
+    setInst(false);
+  };
+  const doInst = () => {
+    if (!DEFER) return;
+    DEFER.prompt();
+    DEFER.userChoice.then(() => {
+      DEFER = null;
+      setCanInst(false);
+    });
+  };
+  const sendInst = async () => {
+    const url = location.origin + location.pathname.replace(/index\.html$/, ''),
+      text = 'Дневен успех – приложение за дневни задачи и напредък, което работи и без интернет. Отвори: ' + url + '\nНа iPhone: Сподели (Share) → Добави към начален екран (Add to Home Screen). На Android: менюто ⋮ → Инсталирай приложение (Install app).';
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Дневен успех',
+          text
+        });
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Текстът е копиран. Постави го в чата.');
+    } catch (e) {
+      prompt('Копирай текста:', text);
+    }
+  };
+  const STEPS = {
+    safari: [React.createElement(React.Fragment, null, "\u041D\u0430\u0442\u0438\u0441\u043D\u0438 ", React.createElement("b", null, "\u0421\u043F\u043E\u0434\u0435\u043B\u0438"), " (Share) \u2013 \u043A\u0432\u0430\u0434\u0440\u0430\u0442\u0447\u0435 \u0441\u044A\u0441 \u0441\u0442\u0440\u0435\u043B\u043A\u0430 \u043D\u0430\u0433\u043E\u0440\u0435 ", React.createElement("span", {
+      className: "inline-block align-middle"
+    }, React.createElement(I, {
+      n: "share",
+      s: 16
+    })), ". \u0410\u043A\u043E \u043D\u0435 \u0433\u043E \u0432\u0438\u0436\u0434\u0430\u0448, \u043F\u044A\u0440\u0432\u043E \u043D\u0430\u0442\u0438\u0441\u043D\u0438 ", React.createElement("b", null, "\u201E\u2026\u201C"), " \u0432 \u0434\u043E\u043B\u043D\u0430\u0442\u0430 \u043B\u0435\u043D\u0442\u0430."), React.createElement(React.Fragment, null, "\u041F\u0440\u0435\u0432\u044A\u0440\u0442\u0438 \u043D\u0430\u0434\u043E\u043B\u0443 \u0438 \u0438\u0437\u0431\u0435\u0440\u0438 ", React.createElement("b", null, "\u0414\u043E\u0431\u0430\u0432\u0438 \u043A\u044A\u043C \u043D\u0430\u0447\u0430\u043B\u0435\u043D \u0435\u043A\u0440\u0430\u043D"), " (Add to Home Screen)."), React.createElement(React.Fragment, null, "\u041E\u0441\u0442\u0430\u0432\u0438 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u043E ", React.createElement("b", null, "\u041E\u0442\u0432\u043E\u0440\u0438 \u043A\u0430\u0442\u043E \u0443\u0435\u0431 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435"), " (Open as Web App) \u0438 \u043D\u0430\u0442\u0438\u0441\u043D\u0438 ", React.createElement("b", null, "\u0414\u043E\u0431\u0430\u0432\u0438"), " (Add).")],
+    chrome: [React.createElement(React.Fragment, null, "\u041D\u0430\u0442\u0438\u0441\u043D\u0438 ", React.createElement("b", null, "\u0421\u043F\u043E\u0434\u0435\u043B\u0438"), " (Share) ", React.createElement("span", {
+      className: "inline-block align-middle"
+    }, React.createElement(I, {
+      n: "share",
+      s: 16
+    })), " \u2013 \u0438\u043A\u043E\u043D\u0430\u0442\u0430 \u0432\u0434\u044F\u0441\u043D\u043E \u043E\u0442 \u0430\u0434\u0440\u0435\u0441\u043D\u0430\u0442\u0430 \u043B\u0435\u043D\u0442\u0430."), React.createElement(React.Fragment, null, "\u0418\u0437\u0431\u0435\u0440\u0438 ", React.createElement("b", null, "\u0414\u043E\u0431\u0430\u0432\u0438 \u043A\u044A\u043C \u043D\u0430\u0447\u0430\u043B\u0435\u043D \u0435\u043A\u0440\u0430\u043D"), " (Add to Home Screen)."), React.createElement(React.Fragment, null, "\u041D\u0430\u0442\u0438\u0441\u043D\u0438 ", React.createElement("b", null, "\u0414\u043E\u0431\u0430\u0432\u0438"), " (Add).")],
+    and: [React.createElement(React.Fragment, null, "\u041D\u0430\u0442\u0438\u0441\u043D\u0438 \u043C\u0435\u043D\u044E\u0442\u043E ", React.createElement("b", null, "\u22EE"), " \u0433\u043E\u0440\u0435 \u0432\u0434\u044F\u0441\u043D\u043E."), React.createElement(React.Fragment, null, "\u0418\u0437\u0431\u0435\u0440\u0438 ", React.createElement("b", null, "\u0418\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u0439 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435"), " (Install app) \u0438\u043B\u0438 ", React.createElement("b", null, "\u0414\u043E\u0431\u0430\u0432\u0438 \u043A\u044A\u043C \u043D\u0430\u0447\u0430\u043B\u043D\u0438\u044F \u0435\u043A\u0440\u0430\u043D"), " (Add to Home screen)."), React.createElement(React.Fragment, null, "\u041F\u043E\u0442\u0432\u044A\u0440\u0434\u0438 \u0441 ", React.createElement("b", null, "\u0418\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u0439"), " (Install).")]
+  };
+  const Install = () => inst ? React.createElement("div", {
+    className: "mb-3 rounded-2xl border border-sky-200 bg-sky-50 p-3"
+  }, React.createElement("div", {
+    className: "flex items-start justify-between gap-2"
+  }, React.createElement("div", {
+    className: "font-extrabold text-sm"
+  }, "\u0418\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u0439 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435\u0442\u043E"), React.createElement("button", {
+    onClick: hideInst,
+    className: "p-1 -m-1",
+    "aria-label": "\u0417\u0430\u0442\u0432\u043E\u0440\u0438"
+  }, React.createElement(I, {
+    n: "x",
+    s: 18
+  }))), React.createElement("div", {
+    className: "flex rounded-lg bg-white p-0.5 text-xs font-semibold mt-2"
+  }, [['safari', 'iPhone Safari'], ['chrome', 'iPhone Chrome'], ['and', 'Android']].map(([id, l]) => React.createElement("button", {
+    key: id,
+    onClick: () => setItab(id),
+    className: `flex-1 px-2 py-1.5 rounded-md ${itab === id ? 'bg-[#1F3A5F] text-white' : ''}`
+  }, l))), itab === 'and' && canInst && React.createElement("button", {
+    onClick: doInst,
+    className: "mt-2 w-full py-2 rounded-lg bg-[#1F3A5F] text-white text-sm font-semibold"
+  }, "\u0418\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u0439"), React.createElement("ol", {
+    className: "list-decimal pl-5 mt-2 space-y-1 text-sm"
+  }, STEPS[itab].map((t, i) => React.createElement("li", {
+    key: i
+  }, t))), itab === 'chrome' && React.createElement("p", {
+    className: "text-xs mt-2 text-slate-600"
+  }, "\u0410\u043A\u043E \u0438\u043A\u043E\u043D\u0430\u0442\u0430 \u0441\u0435 \u043E\u0442\u0432\u0430\u0440\u044F \u0441 \u0430\u0434\u0440\u0435\u0441\u043D\u0430 \u043B\u0435\u043D\u0442\u0430, \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u0439 \u043F\u0440\u0435\u0437 Safari."), itab === 'and' && React.createElement("p", {
+    className: "text-xs mt-2 text-slate-600"
+  }, "\u0412 Brave, Samsung Internet, Edge \u0438\u043B\u0438 Firefox \u043C\u0435\u043D\u044E\u0442\u043E \u0435 \u043F\u043E\u0434\u043E\u0431\u043D\u043E \u2013 \u043F\u043E\u0442\u044A\u0440\u0441\u0438 \u0441\u044A\u0449\u0438\u0442\u0435 \u0434\u0443\u043C\u0438."), React.createElement("p", {
+    className: "text-xs mt-2 text-slate-600"
+  }, "\u041F\u044A\u0440\u0432\u043E \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u0439, \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u043F\u043E\u0447\u043D\u0438 \u0434\u0430 \u043E\u0442\u0431\u0435\u043B\u044F\u0437\u0432\u0430\u0448: \u0434\u0430\u043D\u043D\u0438\u0442\u0435 \u0432 \u0431\u0440\u0430\u0443\u0437\u044A\u0440\u0430 \u0438 \u0432 \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u043D\u043E\u0442\u043E \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0441\u0430 \u043E\u0442\u0434\u0435\u043B\u043D\u0438. \u0410\u043A\u043E \u0432\u0435\u0447\u0435 \u0441\u0438 \u043E\u0442\u0431\u0435\u043B\u044F\u0437\u0432\u0430\u043B, \u043D\u0430\u043F\u0440\u0430\u0432\u0438 \u0435\u043A\u0441\u043F\u043E\u0440\u0442, \u0430 \u043F\u043E\u0441\u043B\u0435 \u0438\u043C\u043F\u043E\u0440\u0442 \u0432 \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u043D\u043E\u0442\u043E (\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0438 \u2192 \u041F\u0440\u0435\u0445\u0432\u044A\u0440\u043B\u044F\u043D\u0435 \u043D\u0430 \u0434\u0430\u043D\u043D\u0438)."), React.createElement("div", {
+    className: "flex gap-2 mt-2 text-sm font-semibold"
+  }, React.createElement("button", {
+    onClick: sendInst,
+    className: "px-3 py-2 rounded-lg bg-white"
+  }, "\u0418\u0437\u043F\u0440\u0430\u0442\u0438 \u043D\u0430 \u043F\u0440\u0438\u044F\u0442\u0435\u043B"), React.createElement("button", {
+    onClick: hideInst,
+    className: "px-3 py-2 rounded-lg bg-white"
+  }, "\u0420\u0430\u0437\u0431\u0440\u0430\u0445"))) : null;
   const firstMark = Object.keys(S.done).filter(k => S.done[k].length).sort()[0];
   const showBk = !!firstMark && dd(today, bk.last || firstMark) >= 7 && !(bk.snooze && bk.snooze > today);
   const Banner = () => showBk ? React.createElement("div", {
@@ -1162,7 +1279,15 @@ function App() {
       onChange: importFile
     }), React.createElement("p", {
       className: "text-xs text-slate-500 mt-2 px-1"
-    }, bk.last ? 'Последно резервно копие: ' + bk.last.split('-').reverse().join('.') : 'Още няма резервно копие.')));
+    }, bk.last ? 'Последно резервно копие: ' + bk.last.split('-').reverse().join('.') : 'Още няма резервно копие.')), React.createElement("button", {
+      onClick: () => {
+        setInst(true);
+        window.scrollTo(0, 0);
+      },
+      className: "w-full bg-white rounded-xl p-3 flex items-center justify-between text-left font-bold"
+    }, "\u041A\u0430\u043A \u0434\u0430 \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u043C", React.createElement(I, {
+      n: "r"
+    })));
   };
   const Sheet = () => {
     const k = sheet,
@@ -1333,7 +1458,7 @@ function App() {
   const TABS = [['cal', 'Календар', 'cal'], ['tpl', 'Шаблони', 'list'], ['stats', 'Статистики', 'chart']];
   return React.createElement("div", {
     className: "w-full max-w-md mx-auto min-h-[100dvh] pb-28 px-3 pt-4"
-  }, Banner(), tab === 'cal' && Calendar(), tab === 'tpl' && Tpls(), tab === 'stats' && Stats(), tab === 'cal' && React.createElement("button", {
+  }, Install(), Banner(), tab === 'cal' && Calendar(), tab === 'tpl' && Tpls(), tab === 'stats' && Stats(), tab === 'cal' && React.createElement("button", {
     onClick: () => open(today),
     className: "fixed right-4 bottom-24 w-14 h-14 rounded-full bg-[#1F3A5F] text-white shadow-xl flex items-center justify-center",
     style: {
