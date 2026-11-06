@@ -58,6 +58,7 @@ const ICON = {
   trash: '<path d="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  more: '<circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/>',
   share: '<path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13"/>',
   l: '<path d="m15 18-6-6 6-6"/>',
   r: '<path d="m9 18 6-6-6-6"/>'
@@ -344,6 +345,7 @@ function App() {
     [xfer, setXfer] = useState(false),
     [shr, setShr] = useState(false),
     [bk, setBk] = useState(loadBk),
+    [how, setHow] = useState(false),
     [inst, setInst] = useState(() => !STANDALONE && (IS_IOS || IS_AND) && !instSeen()),
     [itab, setItab] = useState(instDef),
     [canInst, setCanInst] = useState(!!DEFER),
@@ -795,7 +797,9 @@ function App() {
   }, React.createElement(I, {
     n: "x",
     s: 18
-  }))), React.createElement("div", {
+  }))), React.createElement("p", {
+    className: "text-sm font-semibold mt-1"
+  }, "\u201E\u041A\u043E\u043B\u043A\u043E \u0443\u0441\u043F\u0435\u0448\u0435\u043D \u0435 \u0434\u0435\u043D\u044F\u0442 \u0442\u0438? \u0420\u0435\u0448\u0430\u0432\u0430\u0448\xA0\u0442\u0438.\u201C"), React.createElement("div", {
     className: "flex rounded-lg bg-white p-0.5 text-xs font-semibold mt-2"
   }, [['safari', 'iPhone Safari'], ['chrome', 'iPhone Chrome'], ['and', 'Android']].map(([id, l]) => React.createElement("button", {
     key: id,
@@ -814,7 +818,7 @@ function App() {
     className: "text-xs mt-2 text-slate-600"
   }, "\u0412 Brave, Samsung Internet, Edge \u0438\u043B\u0438 Firefox \u043C\u0435\u043D\u044E\u0442\u043E \u0435 \u043F\u043E\u0434\u043E\u0431\u043D\u043E \u2013 \u043F\u043E\u0442\u044A\u0440\u0441\u0438 \u0441\u044A\u0449\u0438\u0442\u0435 \u0434\u0443\u043C\u0438."), React.createElement("p", {
     className: "text-xs mt-2 text-slate-600"
-  }, "\u041F\u044A\u0440\u0432\u043E \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u0439, \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u043F\u043E\u0447\u043D\u0438 \u0434\u0430 \u043E\u0442\u0431\u0435\u043B\u044F\u0437\u0432\u0430\u0448: \u0434\u0430\u043D\u043D\u0438\u0442\u0435 \u0432 \u0431\u0440\u0430\u0443\u0437\u044A\u0440\u0430 \u0438 \u0432 \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u043D\u043E\u0442\u043E \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0441\u0430 \u043E\u0442\u0434\u0435\u043B\u043D\u0438. \u0410\u043A\u043E \u0432\u0435\u0447\u0435 \u0441\u0438 \u043E\u0442\u0431\u0435\u043B\u044F\u0437\u0432\u0430\u043B, \u043D\u0430\u043F\u0440\u0430\u0432\u0438 \u0435\u043A\u0441\u043F\u043E\u0440\u0442, \u0430 \u043F\u043E\u0441\u043B\u0435 \u0438\u043C\u043F\u043E\u0440\u0442 \u0432 \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u043D\u043E\u0442\u043E (\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0438 \u2192 \u041F\u0440\u0435\u0445\u0432\u044A\u0440\u043B\u044F\u043D\u0435 \u043D\u0430 \u0434\u0430\u043D\u043D\u0438)."), React.createElement("div", {
+  }, "\u041F\u044A\u0440\u0432\u043E \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u0439, \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u043F\u043E\u0447\u043D\u0438 \u0434\u0430 \u043E\u0442\u0431\u0435\u043B\u044F\u0437\u0432\u0430\u0448: \u0434\u0430\u043D\u043D\u0438\u0442\u0435 \u0432 \u0431\u0440\u0430\u0443\u0437\u044A\u0440\u0430 \u0438 \u0432 \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u043D\u043E\u0442\u043E \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0441\u0430 \u043E\u0442\u0434\u0435\u043B\u043D\u0438. \u0410\u043A\u043E \u0432\u0435\u0447\u0435 \u0441\u0438 \u043E\u0442\u0431\u0435\u043B\u044F\u0437\u0432\u0430\u043B, \u043D\u0430\u043F\u0440\u0430\u0432\u0438 \u0435\u043A\u0441\u043F\u043E\u0440\u0442, \u0430 \u043F\u043E\u0441\u043B\u0435 \u0438\u043C\u043F\u043E\u0440\u0442 \u0432 \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u043D\u043E\u0442\u043E (\u041E\u0449\u0435 \u2192 \u041F\u0440\u0435\u0445\u0432\u044A\u0440\u043B\u044F\u043D\u0435 \u043D\u0430 \u0434\u0430\u043D\u043D\u0438)."), React.createElement("div", {
     className: "flex gap-2 mt-2 text-sm font-semibold"
   }, React.createElement("button", {
     onClick: sendInst,
@@ -823,6 +827,83 @@ function App() {
     onClick: hideInst,
     className: "px-3 py-2 rounded-lg bg-white"
   }, "\u0420\u0430\u0437\u0431\u0440\u0430\u0445"))) : null;
+  const How = () => how ? React.createElement("div", {
+    className: "mb-3 rounded-2xl border border-sky-200 bg-sky-50 p-3"
+  }, React.createElement("div", {
+    className: "flex items-start justify-between gap-2"
+  }, React.createElement("div", {
+    className: "font-extrabold text-sm"
+  }, "\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0438"), React.createElement("button", {
+    onClick: () => setHow(false),
+    className: "p-1 -m-1",
+    "aria-label": "\u0417\u0430\u0442\u0432\u043E\u0440\u0438"
+  }, React.createElement(I, {
+    n: "x",
+    s: 18
+  }))), React.createElement("p", {
+    className: "text-base font-extrabold mt-2"
+  }, "\u201E\u041A\u043E\u043B\u043A\u043E \u0443\u0441\u043F\u0435\u0448\u0435\u043D \u0435 \u0434\u0435\u043D\u044F\u0442 \u0442\u0438? \u0420\u0435\u0448\u0430\u0432\u0430\u0448\xA0\u0442\u0438.\u201C"), React.createElement("p", {
+    className: "text-sm mt-2"
+  }, "\u041E\u0442\u0431\u0435\u043B\u044F\u0437\u0432\u0430\u0448 \u0437\u0430\u0434\u0430\u0447\u0438\u0442\u0435 \u0441\u0438. \u0412\u0441\u044F\u043A\u0430 \u0438\u043C\u0430 \u0442\u0435\u0436\u0435\u0441\u0442, \u0430 \u0434\u0435\u043D\u044F\u0442 \u043F\u043E\u043B\u0443\u0447\u0430\u0432\u0430 \u043F\u0440\u043E\u0446\u0435\u043D\u0442 \u0438 \u0446\u0432\u044F\u0442 \u0441\u043F\u043E\u0440\u0435\u0434 \u0442\u043E\u0432\u0430, \u043A\u043E\u0435\u0442\u043E \u0441\u0438 \u0437\u0430\u0432\u044A\u0440\u0448\u0438\u043B."), React.createElement("p", {
+    className: "text-sm mt-2"
+  }, "\u041F\u0440\u0438\u043C\u0435\u0440: \u0437\u0430\u0434\u0430\u0447\u0430 \u0441 \u0442\u0435\u0436\u0435\u0441\u0442 30% \u0434\u043E\u0431\u0430\u0432\u044F 30% \u043A\u044A\u043C \u0434\u0435\u043D\u044F, \u043A\u043E\u0433\u0430\u0442\u043E \u044F \u043E\u0442\u0431\u0435\u043B\u0435\u0436\u0438\u0448."), React.createElement("p", {
+    className: "text-sm mt-2"
+  }, "\u0422\u0438 \u0438\u0437\u0431\u0438\u0440\u0430\u0448 \u0437\u0430\u0434\u0430\u0447\u0438\u0442\u0435 \u0438 \u043A\u043E\u043B\u043A\u043E \u0442\u0435\u0436\u0430\u0442 \u2013 \u0432 \u0440\u0430\u0437\u0434\u0435\u043B \u201E\u0428\u0430\u0431\u043B\u043E\u043D\u0438\u201C."), React.createElement("div", {
+    className: "mt-2 text-sm font-semibold"
+  }, React.createElement("button", {
+    onClick: () => setHow(false),
+    className: "px-3 py-2 rounded-lg bg-white"
+  }, "\u0420\u0430\u0437\u0431\u0440\u0430\u0445"))) : null;
+  const More = () => React.createElement("div", {
+    className: "space-y-3"
+  }, React.createElement("h2", {
+    className: "text-lg font-extrabold"
+  }, "\u041E\u0449\u0435"), React.createElement("div", {
+    className: "relative"
+  }, React.createElement("button", {
+    onClick: () => setXfer(!xfer),
+    className: "w-full bg-white rounded-xl p-3 flex items-center justify-between text-left font-bold",
+    "aria-expanded": xfer
+  }, "\u041F\u0440\u0435\u0445\u0432\u044A\u0440\u043B\u044F\u043D\u0435 \u043D\u0430 \u0434\u0430\u043D\u043D\u0438", React.createElement(I, {
+    n: "r"
+  })), xfer && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "fixed inset-0 z-40",
+    onClick: () => setXfer(false)
+  }), React.createElement("div", {
+    className: "absolute right-0 top-full mt-2 z-50 bg-white rounded-xl shadow-xl border border-slate-200 p-2 flex gap-2"
+  }, React.createElement("button", {
+    onClick: () => fileRef.current && fileRef.current.click(),
+    className: "px-4 py-2 rounded-lg bg-slate-100 text-sm font-semibold"
+  }, "\u0418\u043C\u043F\u043E\u0440\u0442"), React.createElement("button", {
+    onClick: exportData,
+    className: "px-4 py-2 rounded-lg bg-[#1F3A5F] text-white text-sm font-semibold"
+  }, "\u0415\u043A\u0441\u043F\u043E\u0440\u0442"))), React.createElement("input", {
+    ref: fileRef,
+    type: "file",
+    accept: ".json,application/json,text/plain",
+    className: "hidden",
+    onChange: importFile
+  }), React.createElement("p", {
+    className: "text-xs text-slate-500 mt-2 px-1"
+  }, bk.last ? 'Последно резервно копие: ' + bk.last.split('-').reverse().join('.') : 'Още няма резервно копие.')), React.createElement("button", {
+    onClick: () => {
+      setHow(true);
+      setInst(false);
+      window.scrollTo(0, 0);
+    },
+    className: "w-full bg-white rounded-xl p-3 flex items-center justify-between text-left font-bold"
+  }, "\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0438", React.createElement(I, {
+    n: "r"
+  })), React.createElement("button", {
+    onClick: () => {
+      setInst(true);
+      setHow(false);
+      window.scrollTo(0, 0);
+    },
+    className: "w-full bg-white rounded-xl p-3 flex items-center justify-between text-left font-bold"
+  }, "\u041A\u0430\u043A \u0434\u0430 \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u043C", React.createElement(I, {
+    n: "r"
+  })));
   const firstMark = Object.keys(S.done).filter(k => S.done[k].length).sort()[0];
   const showBk = !!firstMark && dd(today, bk.last || firstMark) >= 7 && !(bk.snooze && bk.snooze > today);
   const Banner = () => showBk ? React.createElement("div", {
@@ -936,7 +1017,14 @@ function App() {
       }
     }) : React.createElement("span", {
       key: i
-    })))))), React.createElement(Legend, null));
+    })))))), React.createElement(Legend, null), !firstMark && React.createElement("button", {
+      onClick: () => {
+        setHow(true);
+        setInst(false);
+        window.scrollTo(0, 0);
+      },
+      className: "block mx-auto mt-3 text-sm text-slate-600 underline"
+    }, "\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0438? \u2192"));
   };
   const Tpls = () => {
     const tp = S.tpls.find(t => t.id === selTpl) || S.tpls[0],
@@ -1276,42 +1364,7 @@ function App() {
       className: "text-xs mt-1"
     }, WD[i])))), React.createElement("p", {
       className: "text-sm mt-2"
-    }, "\u041D\u0430\u0439-\u043F\u0440\u043E\u0434\u0443\u043A\u0442\u0438\u0432\u0435\u043D \u0434\u0435\u043D: ", React.createElement("b", null, WD[best]), " (", Math.round(wa[best]), "%)")), React.createElement("div", {
-      className: "relative"
-    }, React.createElement("button", {
-      onClick: () => setXfer(!xfer),
-      className: "w-full bg-white rounded-xl p-3 flex items-center justify-between text-left font-bold",
-      "aria-expanded": xfer
-    }, "\u041F\u0440\u0435\u0445\u0432\u044A\u0440\u043B\u044F\u043D\u0435 \u043D\u0430 \u0434\u0430\u043D\u043D\u0438", React.createElement(I, {
-      n: "r"
-    })), xfer && React.createElement(React.Fragment, null, React.createElement("div", {
-      className: "fixed inset-0 z-40",
-      onClick: () => setXfer(false)
-    }), React.createElement("div", {
-      className: "absolute right-0 top-full mt-2 z-50 bg-white rounded-xl shadow-xl border border-slate-200 p-2 flex gap-2"
-    }, React.createElement("button", {
-      onClick: () => fileRef.current && fileRef.current.click(),
-      className: "px-4 py-2 rounded-lg bg-slate-100 text-sm font-semibold"
-    }, "\u0418\u043C\u043F\u043E\u0440\u0442"), React.createElement("button", {
-      onClick: exportData,
-      className: "px-4 py-2 rounded-lg bg-[#1F3A5F] text-white text-sm font-semibold"
-    }, "\u0415\u043A\u0441\u043F\u043E\u0440\u0442"))), React.createElement("input", {
-      ref: fileRef,
-      type: "file",
-      accept: ".json,application/json,text/plain",
-      className: "hidden",
-      onChange: importFile
-    }), React.createElement("p", {
-      className: "text-xs text-slate-500 mt-2 px-1"
-    }, bk.last ? 'Последно резервно копие: ' + bk.last.split('-').reverse().join('.') : 'Още няма резервно копие.')), React.createElement("button", {
-      onClick: () => {
-        setInst(true);
-        window.scrollTo(0, 0);
-      },
-      className: "w-full bg-white rounded-xl p-3 flex items-center justify-between text-left font-bold"
-    }, "\u041A\u0430\u043A \u0434\u0430 \u0438\u043D\u0441\u0442\u0430\u043B\u0438\u0440\u0430\u043C", React.createElement(I, {
-      n: "r"
-    })));
+    }, "\u041D\u0430\u0439-\u043F\u0440\u043E\u0434\u0443\u043A\u0442\u0438\u0432\u0435\u043D \u0434\u0435\u043D: ", React.createElement("b", null, WD[best]), " (", Math.round(wa[best]), "%)")));
   };
   const Sheet = () => {
     const k = sheet,
@@ -1479,10 +1532,10 @@ function App() {
       className: "w-full p-3 rounded-xl bg-slate-100 text-sm"
     })));
   };
-  const TABS = [['cal', 'Календар', 'cal'], ['tpl', 'Шаблони', 'list'], ['stats', 'Статистики', 'chart']];
+  const TABS = [['cal', 'Календар', 'cal'], ['tpl', 'Шаблони', 'list'], ['stats', 'Статистики', 'chart'], ['more', 'Още', 'more']];
   return React.createElement("div", {
     className: "w-full max-w-md mx-auto min-h-[100dvh] pb-28 px-3 pt-4"
-  }, Install(), Banner(), tab === 'cal' && Calendar(), tab === 'tpl' && Tpls(), tab === 'stats' && Stats(), tab === 'cal' && React.createElement("button", {
+  }, Install(), How(), Banner(), tab === 'cal' && Calendar(), tab === 'tpl' && Tpls(), tab === 'stats' && Stats(), tab === 'more' && More(), tab === 'cal' && React.createElement("button", {
     onClick: () => open(today),
     className: "fixed right-4 bottom-24 w-14 h-14 rounded-full bg-[#1F3A5F] text-white shadow-xl flex items-center justify-center",
     style: {
@@ -1498,7 +1551,7 @@ function App() {
       paddingBottom: 'env(safe-area-inset-bottom)'
     }
   }, React.createElement("div", {
-    className: "max-w-md mx-auto grid grid-cols-3"
+    className: "max-w-md mx-auto grid grid-cols-4"
   }, TABS.map(([id, l, ic]) => React.createElement("button", {
     key: id,
     onClick: () => setTab(id),
